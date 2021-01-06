@@ -11,9 +11,12 @@ readme = "README.md"
 categories = ["algorithms", "data-structures", "hardware-support", "mathematics", "rust-patterns"]
 keywords = ["array", "arrayfire", "gpu", "ndarray", "tensor"]
 
+[build-dependencies]
+pkg-config = "0.3"
+
 [dependencies]
 # There is a bug in ArrayFire 3.7 which breaks af::any and af::all. It should be fixed in ArrayFire 3.8.
 arrayfire = "<3.7"
-number-general = {path = "../number-general"}
+number-general = ">0.1.2"
 num = "0.2"
 safecast = "0.1"
