@@ -105,7 +105,7 @@ impl Array {
         }
     }
 
-    pub fn cast_into(self, dtype: NumberType) -> Array {
+    pub fn cast_into(&self, dtype: NumberType) -> Array {
         use ComplexType as CT;
         use FloatType as FT;
         use IntType as IT;
@@ -137,7 +137,7 @@ impl Array {
                 UT::U64 => Self::U64(self.cast_inner()),
                 UT::UInt => Self::U64(self.cast_inner()),
             },
-            NT::Number => self,
+            NT::Number => self.clone(),
         }
     }
 
@@ -611,42 +611,26 @@ impl Add for &Array {
     type Output = Array;
 
     fn add(self, other: &Array) -> Self::Output {
-        let dtype = Ord::max(self.dtype(), other.dtype());
-
-        use ComplexType as CT;
-        use FloatType as FT;
-        use IntType as IT;
-        use NumberType as NT;
-        use UIntType as UT;
-
-        match dtype {
-            NT::Bool => Array::Bool(&self.cast_inner::<bool>() + &other.cast_inner()),
-            NT::Complex(ct) => match ct {
-                CT::C32 => Array::C32(&self.cast_inner::<_Complex<f32>>() + &other.cast_inner()),
-                CT::C64 => Array::C64(&self.cast_inner::<_Complex<f64>>() + &other.cast_inner()),
-                CT::Complex => Array::C64(
-                    &self.cast_inner::<_Complex<f64>>() + &other.cast_inner::<_Complex<f64>>(),
-                ),
-            },
-            NT::Float(ft) => match ft {
-                FT::F32 => Array::F32(&self.cast_inner::<f32>() + &other.cast_inner()),
-                FT::F64 => Array::F64(&self.cast_inner::<f64>() + &other.cast_inner()),
-                FT::Float => Array::F64(&self.cast_inner::<f64>() + &other.cast_inner::<f64>()),
-            },
-            NT::Int(it) => match it {
-                IT::I16 => Array::I16(&self.cast_inner::<i16>() + &other.cast_inner()),
-                IT::I32 => Array::I32(&self.cast_inner::<i32>() + &other.cast_inner()),
-                IT::I64 => Array::I64(&self.cast_inner::<i64>() + &other.cast_inner()),
-                IT::Int => Array::I64(&self.cast_inner::<i64>() + &other.cast_inner::<i64>()),
-            },
-            NT::UInt(ut) => match ut {
-                UT::U8 => Array::U8(&self.cast_inner::<u8>() + &other.cast_inner()),
-                UT::U16 => Array::U16(&self.cast_inner::<u16>() + &other.cast_inner()),
-                UT::U32 => Array::U32(&self.cast_inner::<u32>() + &other.cast_inner()),
-                UT::U64 => Array::U64(&self.cast_inner::<u64>() + &other.cast_inner()),
-                UT::UInt => Array::U64(&self.cast_inner::<u64>() + &other.cast_inner::<u64>()),
-            },
-            NT::Number => panic!("Array does not support generic type Number"),
+        use Array::*;
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l + r),
+            (C32(l), C32(r)) => C32(l + r),
+            (C64(l), C64(r)) => C64(l + r),
+            (F32(l), F32(r)) => F32(l + r),
+            (F64(l), F64(r)) => F64(l + r),
+            (I16(l), I16(r)) => I16(l + r),
+            (I32(l), I32(r)) => I32(l + r),
+            (I64(l), I64(r)) => I64(l + r),
+            (U8(l), U8(r)) => U8(l + r),
+            (U16(l), U16(r)) => U16(l + r),
+            (U32(l), U32(r)) => U32(l + r),
+            (U64(l), U64(r)) => U64(l + r),
+            (l, r) => {
+                let dtype = Ord::max(l.dtype(), r.dtype());
+                let l = l.cast_into(dtype);
+                let r = r.cast_into(dtype);
+                &l + &r
+            }
         }
     }
 }
@@ -662,42 +646,26 @@ impl Mul for &Array {
     type Output = Array;
 
     fn mul(self, other: &Array) -> Self::Output {
-        let dtype = Ord::max(self.dtype(), other.dtype());
-
-        use ComplexType as CT;
-        use FloatType as FT;
-        use IntType as IT;
-        use NumberType as NT;
-        use UIntType as UT;
-
-        match dtype {
-            NT::Bool => Array::Bool(&self.cast_inner::<bool>() * &other.cast_inner()),
-            NT::Complex(ct) => match ct {
-                CT::C32 => Array::C32(&self.cast_inner::<_Complex<f32>>() * &other.cast_inner()),
-                CT::C64 => Array::C64(&self.cast_inner::<_Complex<f64>>() * &other.cast_inner()),
-                CT::Complex => Array::C64(
-                    &self.cast_inner::<_Complex<f64>>() * &other.cast_inner::<_Complex<f64>>(),
-                ),
-            },
-            NT::Float(ft) => match ft {
-                FT::F32 => Array::F32(&self.cast_inner::<f32>() * &other.cast_inner()),
-                FT::F64 => Array::F64(&self.cast_inner::<f64>() * &other.cast_inner()),
-                FT::Float => Array::F64(&self.cast_inner::<f64>() * &other.cast_inner::<f64>()),
-            },
-            NT::Int(it) => match it {
-                IT::I16 => Array::I16(&self.cast_inner::<i16>() * &other.cast_inner()),
-                IT::I32 => Array::I32(&self.cast_inner::<i32>() * &other.cast_inner()),
-                IT::I64 => Array::I64(&self.cast_inner::<i64>() * &other.cast_inner()),
-                IT::Int => Array::I64(&self.cast_inner::<i64>() * &other.cast_inner::<i64>()),
-            },
-            NT::UInt(ut) => match ut {
-                UT::U8 => Array::U8(&self.cast_inner::<u8>() * &other.cast_inner()),
-                UT::U16 => Array::U16(&self.cast_inner::<u16>() * &other.cast_inner()),
-                UT::U32 => Array::U32(&self.cast_inner::<u32>() * &other.cast_inner()),
-                UT::U64 => Array::U64(&self.cast_inner::<u64>() * &other.cast_inner()),
-                UT::UInt => Array::U64(&self.cast_inner::<u64>() * &other.cast_inner::<u64>()),
-            },
-            NT::Number => panic!("Array does not support generic type Number"),
+        use Array::*;
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l * r),
+            (C32(l), C32(r)) => C32(l * r),
+            (C64(l), C64(r)) => C64(l * r),
+            (F32(l), F32(r)) => F32(l * r),
+            (F64(l), F64(r)) => F64(l * r),
+            (I16(l), I16(r)) => I16(l * r),
+            (I32(l), I32(r)) => I32(l * r),
+            (I64(l), I64(r)) => I64(l * r),
+            (U8(l), U8(r)) => U8(l * r),
+            (U16(l), U16(r)) => U16(l * r),
+            (U32(l), U32(r)) => U32(l * r),
+            (U64(l), U64(r)) => U64(l * r),
+            (l, r) => {
+                let dtype = Ord::max(l.dtype(), r.dtype());
+                let l = l.cast_into(dtype);
+                let r = r.cast_into(dtype);
+                &l * &r
+            }
         }
     }
 }
