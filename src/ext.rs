@@ -75,6 +75,43 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     }
 }
 
+impl ArrayExt<u64> {
+
+    pub fn from_coords<C: IntoIterator<Item = Vec<u64>>>(shape: &[u64], coords: C) -> Self {
+        let ndim = shape.len();
+        let coord_bounds = coord_bounds(shape);
+        let af_coord_bounds: af::Array<u64> =
+            af::Array::new(&coord_bounds, af::Dim4::new(&[ndim as u64, 1, 1, 1]));
+
+        let coords: Vec<u64> = coords.into_iter().flatten().collect();
+        let num_coords = coords.len() / ndim;
+        assert_eq!(coords.len(), num_coords * ndim);
+
+        let coords = af::Array::new(&coords, af::Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]));
+        let offsets = af::mul(&coords, &af_coord_bounds, true);
+        let offsets = af::sum(&offsets, 0);
+
+        Self(offsets)
+    }
+
+    pub fn to_coords(&self, shape: &[u64]) -> Vec<Vec<u64>> {
+        let ndim = shape.len();
+        assert_eq!(self.len() % ndim, 0);
+
+        let coord_bounds = coord_bounds(shape);
+        let af_coord_bounds: af::Array<u64> =
+            af::Array::new(&coord_bounds, af::Dim4::new(&[ndim as u64, 1, 1, 1]));
+        let af_shape: af::Array<u64> = af::Array::new(&shape.to_vec(), af::Dim4::new(&[1, ndim as u64, 1, 1]));
+
+        let offsets = af::div(self.af(), &af_coord_bounds, true);
+        let offsets = af::modulo(&offsets, &af_shape, true);
+
+        let mut coords = vec![0u64; offsets.elements()];
+        af::transpose(&offsets, false).host(&mut coords);
+        coords.chunks(ndim).map(|coord| coord.to_vec()).collect()
+    }
+}
+
 impl<T: af::HasAfEnum> ArrayInstance for ArrayExt<T> {
     type DType = T;
 
@@ -585,6 +622,12 @@ impl ArrayInstanceReduce for ArrayExt<u64> {
     fn sum(&self) -> u64 {
         af::sum_all(self.af()).0 as u64
     }
+}
+
+fn coord_bounds(shape: &[u64]) -> Vec<u64> {
+    (0..shape.len())
+        .map(|axis| shape[axis + 1..].iter().product())
+        .collect()
 }
 
 fn vec_into<S, D>(source: Vec<S>) -> Vec<D> where D: From<S> {
