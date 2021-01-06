@@ -18,5 +18,5 @@ pkg-config = "0.3"
 # There is a bug in ArrayFire 3.7 which breaks af::any and af::all. It should be fixed in ArrayFire 3.8.
 arrayfire = "<3.7"
 number-general = ">0.1.2"
-num = "0.2"
+num-complex = "0.2"
 safecast = "0.1"
