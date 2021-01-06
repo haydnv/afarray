@@ -96,6 +96,27 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     }
 }
 
+impl ArrayExt<bool> {
+    pub fn not(&self) -> Self {
+        ArrayExt(!self.af())
+    }
+
+    pub fn and(&self, other: &Self) -> Self {
+        ArrayExt(af::and(self.af(), other.af(), BATCH))
+    }
+
+    pub fn or(&self, other: &Self) -> Self {
+        ArrayExt(af::or(self.af(), other.af(), BATCH))
+    }
+
+    pub fn xor(&self, other: &Self) -> Self {
+        let one = af::or(self.af(), other.af(), BATCH);
+        let not_both = !(&af::and(self.af(), other.af(), BATCH));
+        let one_and_not_both = af::and(&one, &not_both, BATCH);
+        ArrayExt(one_and_not_both)
+    }
+}
+
 impl ArrayExt<u64> {
     pub fn from_coords<C: IntoIterator<Item = Vec<u64>>>(shape: &[u64], coords: C) -> Self {
         let ndim = shape.len();
@@ -371,48 +392,6 @@ impl ArrayInstanceAnyAll for ArrayExt<_Complex<f64>> {
     fn any(&self) -> bool {
         let any = af::any_true_all(self.af());
         any.0 > 0.0f64 || any.1 > 0.0f64
-    }
-}
-
-pub trait ArrayInstanceNot: ArrayInstance {
-    fn not(&self) -> ArrayExt<bool>;
-}
-
-impl ArrayInstanceNot for ArrayExt<bool> {
-    fn not(&self) -> ArrayExt<bool> {
-        ArrayExt(!self.af())
-    }
-}
-
-pub trait ArrayInstanceBool: ArrayInstance {
-    fn and(&self, other: &Self) -> ArrayExt<bool>;
-
-    fn or(&self, other: &Self) -> ArrayExt<bool>;
-
-    fn xor(&self, other: &Self) -> ArrayExt<bool>;
-}
-
-impl<T: af::HasAfEnum> ArrayInstanceBool for ArrayExt<T> {
-    fn and(&self, other: &Self) -> ArrayExt<bool> {
-        let l: af::Array<bool> = self.af().cast();
-        let r: af::Array<bool> = other.af().cast();
-        ArrayExt(af::and(&l, &r, BATCH))
-    }
-
-    fn or(&self, other: &Self) -> ArrayExt<bool> {
-        let l: af::Array<bool> = self.af().cast();
-        let r: af::Array<bool> = other.af().cast();
-        ArrayExt(af::and(&l, &r, BATCH))
-    }
-
-    fn xor(&self, other: &Self) -> ArrayExt<bool> {
-        let l: af::Array<bool> = self.af().cast();
-        let r: af::Array<bool> = other.af().cast();
-
-        let one = af::or(&l, &r, BATCH);
-        let not_both = !(&af::and(&l, &r, BATCH));
-        let one_and_not_both = af::and(&one, &not_both, BATCH);
-        ArrayExt(one_and_not_both.cast())
     }
 }
 
