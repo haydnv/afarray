@@ -1,12 +1,12 @@
-use std::convert::TryFrom;
 use std::fmt;
+use std::ops::*;
 
 use arrayfire as af;
 use number_general::*;
 use safecast::{CastFrom, CastInto};
 
 use super::ext::*;
-use super::{dim4, error, _Complex, ArrayError, Result};
+use super::{dim4, error, _Complex, Result};
 
 #[derive(Clone)]
 pub enum Array {
@@ -244,44 +244,6 @@ impl Array {
         }
     }
 
-    pub fn add(&self, other: &Array) -> Array {
-        let dtype = Ord::max(self.dtype(), other.dtype());
-
-        use ComplexType as CT;
-        use FloatType as FT;
-        use IntType as IT;
-        use NumberType as NT;
-        use UIntType as UT;
-
-        match dtype {
-            NT::Bool => Self::Bool(self.af_cast::<bool>() + other.af_cast()),
-            NT::Complex(ct) => match ct {
-                CT::C32 => Self::C32(self.af_cast::<_Complex<f32>>() + other.af_cast()),
-                CT::C64 => Self::C64(self.af_cast::<_Complex<f64>>() + other.af_cast()),
-                CT::Complex => Self::C64(self.af_cast::<_Complex<f64>>() + other.af_cast::<_Complex<f64>>())
-            },
-            NT::Float(ft) => match ft {
-                FT::F32 => Self::F32(self.af_cast::<f32>() + other.af_cast()),
-                FT::F64 => Self::F64(self.af_cast::<f64>() + other.af_cast()),
-                FT::Float => Self::F64(self.af_cast::<f64>() + other.af_cast::<f64>())
-            },
-            NT::Int(it) => match it {
-                IT::I16 => Self::I16(self.af_cast::<i16>() + other.af_cast()),
-                IT::I32 => Self::I32(self.af_cast::<i32>() + other.af_cast()),
-                IT::I64 => Self::I64(self.af_cast::<i64>() + other.af_cast()),
-                IT::Int => Self::I64(self.af_cast::<i64>() + other.af_cast::<i64>())
-            },
-            NT::UInt(ut) => match ut {
-                UT::U8 => Self::U8(self.af_cast::<u8>() + other.af_cast()),
-                UT::U16 => Self::U16(self.af_cast::<u16>() + other.af_cast()),
-                UT::U32 => Self::U32(self.af_cast::<u32>() + other.af_cast()),
-                UT::U64 => Self::U64(self.af_cast::<u64>() + other.af_cast()),
-                UT::UInt => Self::U64(self.af_cast::<u64>() + other.af_cast::<u64>())
-            },
-            NT::Number => panic!("Array does not support generic type Number"),
-        }
-    }
-
     pub fn and(&self, other: &Array) -> Array {
         let this: ArrayExt<bool> = self.af_cast();
         let that: ArrayExt<bool> = other.af_cast();
@@ -394,44 +356,6 @@ impl Array {
             U16(l) => Bool(l.ne(&other.af_cast())),
             U32(l) => Bool(l.ne(&other.af_cast())),
             U64(l) => Bool(l.ne(&other.af_cast())),
-        }
-    }
-
-    pub fn multiply(&self, other: &Array) -> Array {
-        let dtype = Ord::max(self.dtype(), other.dtype());
-
-        use ComplexType as CT;
-        use FloatType as FT;
-        use IntType as IT;
-        use NumberType as NT;
-        use UIntType as UT;
-
-        match dtype {
-            NT::Bool => Self::Bool(self.af_cast::<bool>() * other.af_cast()),
-            NT::Complex(ct) => match ct {
-                CT::C32 => Self::C32(self.af_cast::<_Complex<f32>>() * other.af_cast()),
-                CT::C64 => Self::C64(self.af_cast::<_Complex<f64>>() * other.af_cast()),
-                CT::Complex => Self::C64(self.af_cast::<_Complex<f64>>() * other.af_cast::<_Complex<f64>>())
-            },
-            NT::Float(ft) => match ft {
-                FT::F32 => Self::F32(self.af_cast::<f32>() * other.af_cast()),
-                FT::F64 => Self::F64(self.af_cast::<f64>() * other.af_cast()),
-                FT::Float => Self::F64(self.af_cast::<f64>() * other.af_cast::<f64>())
-            },
-            NT::Int(it) => match it {
-                IT::I16 => Self::I16(self.af_cast::<i16>() * other.af_cast()),
-                IT::I32 => Self::I32(self.af_cast::<i32>() * other.af_cast()),
-                IT::I64 => Self::I64(self.af_cast::<i64>() * other.af_cast()),
-                IT::Int => Self::I64(self.af_cast::<i64>() * other.af_cast::<i64>())
-            },
-            NT::UInt(ut) => match ut {
-                UT::U8 => Self::U8(self.af_cast::<u8>() * other.af_cast()),
-                UT::U16 => Self::U16(self.af_cast::<u16>() * other.af_cast()),
-                UT::U32 => Self::U32(self.af_cast::<u32>() * other.af_cast()),
-                UT::U64 => Self::U64(self.af_cast::<u64>() * other.af_cast()),
-                UT::UInt => Self::U64(self.af_cast::<u64>() * other.af_cast::<u64>())
-            },
-            NT::Number => panic!("Array does not support generic type Number"),
         }
     }
 
@@ -710,16 +634,101 @@ impl Array {
     }
 }
 
-impl TryFrom<af::Array<u64>> for Array {
-    type Error = ArrayError;
+impl Add for &Array {
+    type Output = Array;
 
-    fn try_from(arr: af::Array<u64>) -> Result<Array> {
-        let size = arr.elements() as u64;
-        if arr.dims() == af::Dim4::new(&[size, 1, 1, 1]) {
-            Ok(Array::U64(arr.into()))
-        } else {
-            Err(error("Array only supports a single dimension"))
+    fn add(self, other: &Array) -> Self::Output {
+        let dtype = Ord::max(self.dtype(), other.dtype());
+
+        use ComplexType as CT;
+        use FloatType as FT;
+        use IntType as IT;
+        use NumberType as NT;
+        use UIntType as UT;
+
+        match dtype {
+            NT::Bool => Array::Bool(self.af_cast::<bool>() + other.af_cast()),
+            NT::Complex(ct) => match ct {
+                CT::C32 => Array::C32(self.af_cast::<_Complex<f32>>() + other.af_cast()),
+                CT::C64 => Array::C64(self.af_cast::<_Complex<f64>>() + other.af_cast()),
+                CT::Complex => Array::C64(self.af_cast::<_Complex<f64>>() + other.af_cast::<_Complex<f64>>())
+            },
+            NT::Float(ft) => match ft {
+                FT::F32 => Array::F32(self.af_cast::<f32>() + other.af_cast()),
+                FT::F64 => Array::F64(self.af_cast::<f64>() + other.af_cast()),
+                FT::Float => Array::F64(self.af_cast::<f64>() + other.af_cast::<f64>())
+            },
+            NT::Int(it) => match it {
+                IT::I16 => Array::I16(self.af_cast::<i16>() + other.af_cast()),
+                IT::I32 => Array::I32(self.af_cast::<i32>() + other.af_cast()),
+                IT::I64 => Array::I64(self.af_cast::<i64>() + other.af_cast()),
+                IT::Int => Array::I64(self.af_cast::<i64>() + other.af_cast::<i64>())
+            },
+            NT::UInt(ut) => match ut {
+                UT::U8 => Array::U8(self.af_cast::<u8>() + other.af_cast()),
+                UT::U16 => Array::U16(self.af_cast::<u16>() + other.af_cast()),
+                UT::U32 => Array::U32(self.af_cast::<u32>() + other.af_cast()),
+                UT::U64 => Array::U64(self.af_cast::<u64>() + other.af_cast()),
+                UT::UInt => Array::U64(self.af_cast::<u64>() + other.af_cast::<u64>())
+            },
+            NT::Number => panic!("Array does not support generic type Number"),
         }
+    }
+}
+
+impl AddAssign for Array {
+    fn add_assign(&mut self, other: Self) {
+        let sum = &*self + &other;
+        *self = sum;
+    }
+}
+
+impl Mul for &Array {
+    type Output = Array;
+
+    fn mul(self, other: &Array) -> Self::Output {
+        let dtype = Ord::max(self.dtype(), other.dtype());
+
+        use ComplexType as CT;
+        use FloatType as FT;
+        use IntType as IT;
+        use NumberType as NT;
+        use UIntType as UT;
+
+        match dtype {
+            NT::Bool => Array::Bool(self.af_cast::<bool>() * other.af_cast()),
+            NT::Complex(ct) => match ct {
+                CT::C32 => Array::C32(self.af_cast::<_Complex<f32>>() * other.af_cast()),
+                CT::C64 => Array::C64(self.af_cast::<_Complex<f64>>() * other.af_cast()),
+                CT::Complex => Array::C64(self.af_cast::<_Complex<f64>>() * other.af_cast::<_Complex<f64>>())
+            },
+            NT::Float(ft) => match ft {
+                FT::F32 => Array::F32(self.af_cast::<f32>() * other.af_cast()),
+                FT::F64 => Array::F64(self.af_cast::<f64>() * other.af_cast()),
+                FT::Float => Array::F64(self.af_cast::<f64>() * other.af_cast::<f64>())
+            },
+            NT::Int(it) => match it {
+                IT::I16 => Array::I16(self.af_cast::<i16>() * other.af_cast()),
+                IT::I32 => Array::I32(self.af_cast::<i32>() * other.af_cast()),
+                IT::I64 => Array::I64(self.af_cast::<i64>() * other.af_cast()),
+                IT::Int => Array::I64(self.af_cast::<i64>() * other.af_cast::<i64>())
+            },
+            NT::UInt(ut) => match ut {
+                UT::U8 => Array::U8(self.af_cast::<u8>() * other.af_cast()),
+                UT::U16 => Array::U16(self.af_cast::<u16>() * other.af_cast()),
+                UT::U32 => Array::U32(self.af_cast::<u32>() * other.af_cast()),
+                UT::U64 => Array::U64(self.af_cast::<u64>() * other.af_cast()),
+                UT::UInt => Array::U64(self.af_cast::<u64>() * other.af_cast::<u64>())
+            },
+            NT::Number => panic!("Array does not support generic type Number"),
+        }
+    }
+}
+
+impl MulAssign for Array {
+    fn mul_assign(&mut self, other: Array) {
+        let product = &*self * &other;
+        *self = product;
     }
 }
 
