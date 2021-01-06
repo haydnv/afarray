@@ -6,7 +6,7 @@ use number_general::*;
 use safecast::{CastFrom, CastInto};
 
 use super::ext::*;
-use super::{dim4, error, _Complex, Result};
+use super::{dim4, error, Result, _Complex};
 
 #[derive(Clone)]
 pub enum Array {
@@ -47,7 +47,11 @@ impl Array {
         use Array::*;
         match (left, right) {
             (U64(l), U64(r)) => Ok(U64(ArrayExt::concatenate(&l, &r))),
-            (l, r) => Err(error(format!("Cannot concatenate arrays with different data types: {}, {}", l.dtype(), r.dtype()))),
+            (l, r) => Err(error(format!(
+                "Cannot concatenate arrays with different data types: {}, {}",
+                l.dtype(),
+                r.dtype()
+            ))),
         }
     }
 
@@ -82,7 +86,10 @@ impl Array {
         }
     }
 
-    pub fn try_cast_from<N>(values: Vec<N>, dtype: NumberType) -> Result<Array> where Number: From<N> {
+    pub fn try_cast_from<N>(values: Vec<N>, dtype: NumberType) -> Result<Array>
+    where
+        Number: From<N>,
+    {
         const UNSUPPORTED: &str = "Array requires a uniform type of Number";
         let values = values.into_iter().map(Number::from);
 
@@ -92,27 +99,27 @@ impl Array {
             NumberType::Complex(c) => match c {
                 ComplexType::C32 => C32(vec_cast_into(values).into()),
                 ComplexType::C64 => C32(vec_cast_into(values).into()),
-                ComplexType::Complex => return Err(error(UNSUPPORTED))
+                ComplexType::Complex => return Err(error(UNSUPPORTED)),
             },
             NumberType::Float(f) => match f {
                 FloatType::F32 => F32(vec_cast_into(values).into()),
                 FloatType::F64 => F32(vec_cast_into(values).into()),
-                FloatType::Float => return Err(error(UNSUPPORTED))
+                FloatType::Float => return Err(error(UNSUPPORTED)),
             },
             NumberType::Int(i) => match i {
                 IntType::I16 => I16(vec_cast_into(values).into()),
                 IntType::I32 => I32(vec_cast_into(values).into()),
                 IntType::I64 => I64(vec_cast_into(values).into()),
-                IntType::Int => return Err(error(UNSUPPORTED))
+                IntType::Int => return Err(error(UNSUPPORTED)),
             },
             NumberType::UInt(u) => match u {
                 UIntType::U8 => U8(vec_cast_into(values).into()),
                 UIntType::U16 => U16(vec_cast_into(values).into()),
                 UIntType::U32 => U32(vec_cast_into(values).into()),
                 UIntType::U64 => U64(vec_cast_into(values).into()),
-                UIntType::UInt => return Err(error(UNSUPPORTED))
+                UIntType::UInt => return Err(error(UNSUPPORTED)),
             },
-            NumberType::Number => return Err(error(UNSUPPORTED))
+            NumberType::Number => return Err(error(UNSUPPORTED)),
         };
 
         Ok(chunk)
@@ -563,7 +570,12 @@ impl Array {
             U16(u) => u.sort(ascending),
             U32(u) => u.sort(ascending),
             U64(u) => u.sort(ascending),
-            other => return Err(error(format!("{} does not support ordering", other.dtype())))
+            other => {
+                return Err(error(format!(
+                    "{} does not support ordering",
+                    other.dtype()
+                )))
+            }
         }
 
         Ok(())
@@ -623,7 +635,10 @@ impl Array {
                 }
             }
         } else {
-            Err(error(format!("Invalid pivot for Array of length {}", self.len())))
+            Err(error(format!(
+                "Invalid pivot for Array of length {}",
+                self.len()
+            )))
         }
     }
 
@@ -647,29 +662,31 @@ impl Add for &Array {
         use UIntType as UT;
 
         match dtype {
-            NT::Bool => Array::Bool(self.af_cast::<bool>() + other.af_cast()),
+            NT::Bool => Array::Bool(&self.af_cast::<bool>() + &other.af_cast()),
             NT::Complex(ct) => match ct {
-                CT::C32 => Array::C32(self.af_cast::<_Complex<f32>>() + other.af_cast()),
-                CT::C64 => Array::C64(self.af_cast::<_Complex<f64>>() + other.af_cast()),
-                CT::Complex => Array::C64(self.af_cast::<_Complex<f64>>() + other.af_cast::<_Complex<f64>>())
+                CT::C32 => Array::C32(&self.af_cast::<_Complex<f32>>() + &other.af_cast()),
+                CT::C64 => Array::C64(&self.af_cast::<_Complex<f64>>() + &other.af_cast()),
+                CT::Complex => {
+                    Array::C64(&self.af_cast::<_Complex<f64>>() + &other.af_cast::<_Complex<f64>>())
+                }
             },
             NT::Float(ft) => match ft {
-                FT::F32 => Array::F32(self.af_cast::<f32>() + other.af_cast()),
-                FT::F64 => Array::F64(self.af_cast::<f64>() + other.af_cast()),
-                FT::Float => Array::F64(self.af_cast::<f64>() + other.af_cast::<f64>())
+                FT::F32 => Array::F32(&self.af_cast::<f32>() + &other.af_cast()),
+                FT::F64 => Array::F64(&self.af_cast::<f64>() + &other.af_cast()),
+                FT::Float => Array::F64(&self.af_cast::<f64>() + &other.af_cast::<f64>()),
             },
             NT::Int(it) => match it {
-                IT::I16 => Array::I16(self.af_cast::<i16>() + other.af_cast()),
-                IT::I32 => Array::I32(self.af_cast::<i32>() + other.af_cast()),
-                IT::I64 => Array::I64(self.af_cast::<i64>() + other.af_cast()),
-                IT::Int => Array::I64(self.af_cast::<i64>() + other.af_cast::<i64>())
+                IT::I16 => Array::I16(&self.af_cast::<i16>() + &other.af_cast()),
+                IT::I32 => Array::I32(&self.af_cast::<i32>() + &other.af_cast()),
+                IT::I64 => Array::I64(&self.af_cast::<i64>() + &other.af_cast()),
+                IT::Int => Array::I64(&self.af_cast::<i64>() + &other.af_cast::<i64>()),
             },
             NT::UInt(ut) => match ut {
-                UT::U8 => Array::U8(self.af_cast::<u8>() + other.af_cast()),
-                UT::U16 => Array::U16(self.af_cast::<u16>() + other.af_cast()),
-                UT::U32 => Array::U32(self.af_cast::<u32>() + other.af_cast()),
-                UT::U64 => Array::U64(self.af_cast::<u64>() + other.af_cast()),
-                UT::UInt => Array::U64(self.af_cast::<u64>() + other.af_cast::<u64>())
+                UT::U8 => Array::U8(&self.af_cast::<u8>() + &other.af_cast()),
+                UT::U16 => Array::U16(&self.af_cast::<u16>() + &other.af_cast()),
+                UT::U32 => Array::U32(&self.af_cast::<u32>() + &other.af_cast()),
+                UT::U64 => Array::U64(&self.af_cast::<u64>() + &other.af_cast()),
+                UT::UInt => Array::U64(&self.af_cast::<u64>() + &other.af_cast::<u64>()),
             },
             NT::Number => panic!("Array does not support generic type Number"),
         }
@@ -696,29 +713,31 @@ impl Mul for &Array {
         use UIntType as UT;
 
         match dtype {
-            NT::Bool => Array::Bool(self.af_cast::<bool>() * other.af_cast()),
+            NT::Bool => Array::Bool(&self.af_cast::<bool>() * &other.af_cast()),
             NT::Complex(ct) => match ct {
-                CT::C32 => Array::C32(self.af_cast::<_Complex<f32>>() * other.af_cast()),
-                CT::C64 => Array::C64(self.af_cast::<_Complex<f64>>() * other.af_cast()),
-                CT::Complex => Array::C64(self.af_cast::<_Complex<f64>>() * other.af_cast::<_Complex<f64>>())
+                CT::C32 => Array::C32(&self.af_cast::<_Complex<f32>>() * &other.af_cast()),
+                CT::C64 => Array::C64(&self.af_cast::<_Complex<f64>>() * &other.af_cast()),
+                CT::Complex => {
+                    Array::C64(&self.af_cast::<_Complex<f64>>() * &other.af_cast::<_Complex<f64>>())
+                }
             },
             NT::Float(ft) => match ft {
-                FT::F32 => Array::F32(self.af_cast::<f32>() * other.af_cast()),
-                FT::F64 => Array::F64(self.af_cast::<f64>() * other.af_cast()),
-                FT::Float => Array::F64(self.af_cast::<f64>() * other.af_cast::<f64>())
+                FT::F32 => Array::F32(&self.af_cast::<f32>() * &other.af_cast()),
+                FT::F64 => Array::F64(&self.af_cast::<f64>() * &other.af_cast()),
+                FT::Float => Array::F64(&self.af_cast::<f64>() * &other.af_cast::<f64>()),
             },
             NT::Int(it) => match it {
-                IT::I16 => Array::I16(self.af_cast::<i16>() * other.af_cast()),
-                IT::I32 => Array::I32(self.af_cast::<i32>() * other.af_cast()),
-                IT::I64 => Array::I64(self.af_cast::<i64>() * other.af_cast()),
-                IT::Int => Array::I64(self.af_cast::<i64>() * other.af_cast::<i64>())
+                IT::I16 => Array::I16(&self.af_cast::<i16>() * &other.af_cast()),
+                IT::I32 => Array::I32(&self.af_cast::<i32>() * &other.af_cast()),
+                IT::I64 => Array::I64(&self.af_cast::<i64>() * &other.af_cast()),
+                IT::Int => Array::I64(&self.af_cast::<i64>() * &other.af_cast::<i64>()),
             },
             NT::UInt(ut) => match ut {
-                UT::U8 => Array::U8(self.af_cast::<u8>() * other.af_cast()),
-                UT::U16 => Array::U16(self.af_cast::<u16>() * other.af_cast()),
-                UT::U32 => Array::U32(self.af_cast::<u32>() * other.af_cast()),
-                UT::U64 => Array::U64(self.af_cast::<u64>() * other.af_cast()),
-                UT::UInt => Array::U64(self.af_cast::<u64>() * other.af_cast::<u64>())
+                UT::U8 => Array::U8(&self.af_cast::<u8>() * &other.af_cast()),
+                UT::U16 => Array::U16(&self.af_cast::<u16>() * &other.af_cast()),
+                UT::U32 => Array::U32(&self.af_cast::<u32>() * &other.af_cast()),
+                UT::U64 => Array::U64(&self.af_cast::<u64>() * &other.af_cast()),
+                UT::UInt => Array::U64(&self.af_cast::<u64>() * &other.af_cast::<u64>()),
             },
             NT::Number => panic!("Array does not support generic type Number"),
         }

@@ -9,7 +9,7 @@ pub use ext::*;
 type _Complex<T> = num_complex::Complex<T>;
 
 pub struct ArrayError {
-    message: String
+    message: String,
 }
 
 impl fmt::Debug for ArrayError {
@@ -27,7 +27,9 @@ impl fmt::Display for ArrayError {
 pub type Result<T> = std::result::Result<T, ArrayError>;
 
 fn error<I: fmt::Display>(message: I) -> ArrayError {
-    ArrayError { message: message.to_string() }
+    ArrayError {
+        message: message.to_string(),
+    }
 }
 
 fn dim4(size: usize) -> arrayfire::Dim4 {
