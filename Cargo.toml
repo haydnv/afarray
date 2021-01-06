@@ -1,0 +1,16 @@
+[package]
+name = "afarray"
+version = "0.1.0"
+authors = ["haydnv"]
+edition = "2018"
+license-file = "LICENSE"
+description = "Convenience methods for working with ArrayFire arrays in Rust"
+repository = "http://github.com/haydnv/collate"
+readme = "README.md"
+
+categories = ["algorithms", "data-structures", "hardware-support", "mathematics", "rust-patterns"]
+keywords = ["array", "arrayfire", "gpu", "ndarray", "tensor"]
+
+[dependencies]
+arrayfire = "3.6"
+number-general = "0.1"
