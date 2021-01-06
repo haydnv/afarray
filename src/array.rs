@@ -801,6 +801,24 @@ impl From<ArrayExt<u64>> for Array {
     }
 }
 
+impl<T: af::HasAfEnum> From<Vec<T>> for Array
+where
+    Array: From<ArrayExt<T>>,
+{
+    fn from(values: Vec<T>) -> Self {
+        ArrayExt::from(values.as_slice()).into()
+    }
+}
+
+impl<T: af::HasAfEnum> From<&[T]> for Array
+where
+    Array: From<ArrayExt<T>>,
+{
+    fn from(values: &[T]) -> Self {
+        ArrayExt::from(values).into()
+    }
+}
+
 impl<T: af::HasAfEnum> FromIterator<T> for Array
 where
     Array: From<ArrayExt<T>>,
@@ -838,16 +856,16 @@ mod tests {
 
     #[test]
     fn test_get_value() {
-        let arr = Array::from_iter(vec![1, 2, 3]);
+        let arr = Array::from(&[1, 2, 3][..]);
         assert_eq!(arr.get_value(1), Number::from(2))
     }
 
     #[test]
     fn test_get() {
-        let arr = Array::from_iter(vec![1, 2, 3]);
+        let arr = Array::from(vec![1, 2, 3].as_slice());
         let indices = af::Array::new(&[1, 2], af::Dim4::new(&[2, 1, 1, 1]));
         let actual = arr.get(indices);
-        let expected = Array::from_iter(vec![2, 3]);
+        let expected = Array::from(&[2, 3][..]);
         assert_eq!(
             actual.eq(&expected).to_vec(),
             vec![true.into(), true.into()]
@@ -856,10 +874,10 @@ mod tests {
 
     #[test]
     fn test_set() {
-        let mut actual: Array = vec![1, 2, 3].into_iter().collect();
+        let mut actual = Array::from(&[1, 2, 3][..]);
         let indices = af::Array::new(&[1, 2], af::Dim4::new(&[2, 1, 1, 1]));
-        actual.set(indices, &Array::from_iter(vec![4, 5])).unwrap();
-        let expected = Array::from_iter(vec![1, 4, 5]);
+        actual.set(indices, &Array::from(&[4, 5][..])).unwrap();
+        let expected = Array::from(&[1, 4, 5][..]);
         assert_eq!(
             actual.eq(&expected).to_vec(),
             vec![true.into(), true.into(), true.into()]

@@ -253,10 +253,10 @@ impl<T: af::HasAfEnum> From<af::Array<T>> for ArrayExt<T> {
     }
 }
 
-impl<T: af::HasAfEnum> From<Vec<T>> for ArrayExt<T> {
-    fn from(values: Vec<T>) -> ArrayExt<T> {
+impl<T: af::HasAfEnum> From<&[T]> for ArrayExt<T> {
+    fn from(values: &[T]) -> ArrayExt<T> {
         let dim = dim4(values.len());
-        ArrayExt(af::Array::new(&values, dim))
+        ArrayExt(af::Array::new(values, dim))
     }
 }
 
