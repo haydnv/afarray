@@ -7,6 +7,7 @@ use safecast::{CastFrom, CastInto};
 
 use super::ext::*;
 use super::{dim4, error, Result, _Complex};
+use std::iter::FromIterator;
 
 #[derive(Clone)]
 pub enum Array {
@@ -728,87 +729,85 @@ impl<T: af::HasAfEnum> CastFrom<Array> for ArrayExt<T> {
     }
 }
 
-impl From<Vec<bool>> for Array {
-    fn from(b: Vec<bool>) -> Array {
-        let data = af::Array::new(&b, dim4(b.len()));
-        Array::Bool(data.into())
+impl From<ArrayExt<bool>> for Array {
+    fn from(i: ArrayExt<bool>) -> Array {
+        Array::Bool(i)
     }
 }
 
-impl From<Vec<_Complex<f32>>> for Array {
-    fn from(c: Vec<_Complex<f32>>) -> Array {
-        let data = af::Array::new(&c, dim4(c.len()));
-        Array::C32(data.into())
+impl From<ArrayExt<_Complex<f32>>> for Array {
+    fn from(c: ArrayExt<_Complex<f32>>) -> Array {
+        Array::C32(c)
     }
 }
 
-impl From<Vec<_Complex<f64>>> for Array {
-    fn from(c: Vec<_Complex<f64>>) -> Array {
-        let data = af::Array::new(&c, dim4(c.len()));
-        Array::C64(data.into())
+impl From<ArrayExt<_Complex<f64>>> for Array {
+    fn from(c: ArrayExt<_Complex<f64>>) -> Array {
+        Array::C64(c)
     }
 }
 
-impl From<Vec<f32>> for Array {
-    fn from(f: Vec<f32>) -> Array {
-        let data = af::Array::new(&f, dim4(f.len()));
-        Array::F32(data.into())
+impl From<ArrayExt<f32>> for Array {
+    fn from(f: ArrayExt<f32>) -> Array {
+        Array::F32(f)
     }
 }
 
-impl From<Vec<f64>> for Array {
-    fn from(f: Vec<f64>) -> Array {
-        let data = af::Array::new(&f, dim4(f.len()));
-        Array::F64(data.into())
+impl From<ArrayExt<f64>> for Array {
+    fn from(f: ArrayExt<f64>) -> Array {
+        Array::F64(f)
     }
 }
 
-impl From<Vec<i16>> for Array {
-    fn from(i: Vec<i16>) -> Array {
-        let data = af::Array::new(&i, dim4(i.len()));
-        Array::I16(data.into())
+impl From<ArrayExt<i16>> for Array {
+    fn from(i: ArrayExt<i16>) -> Array {
+        Array::I16(i)
     }
 }
 
-impl From<Vec<i32>> for Array {
-    fn from(i: Vec<i32>) -> Array {
-        let data = af::Array::new(&i, dim4(i.len()));
-        Array::I32(data.into())
+impl From<ArrayExt<i32>> for Array {
+    fn from(i: ArrayExt<i32>) -> Array {
+        Array::I32(i)
     }
 }
 
-impl From<Vec<i64>> for Array {
-    fn from(i: Vec<i64>) -> Array {
-        let data = af::Array::new(&i, dim4(i.len()));
-        Array::I64(data.into())
+impl From<ArrayExt<i64>> for Array {
+    fn from(i: ArrayExt<i64>) -> Array {
+        Array::I64(i)
     }
 }
 
-impl From<Vec<u8>> for Array {
-    fn from(u: Vec<u8>) -> Array {
-        let data = af::Array::new(&u, dim4(u.len()));
-        Array::U8(data.into())
+impl From<ArrayExt<u8>> for Array {
+    fn from(u: ArrayExt<u8>) -> Array {
+        Array::U8(u)
     }
 }
 
-impl From<Vec<u16>> for Array {
-    fn from(u: Vec<u16>) -> Array {
-        let data = af::Array::new(&u, dim4(u.len()));
-        Array::U16(data.into())
+impl From<ArrayExt<u16>> for Array {
+    fn from(u: ArrayExt<u16>) -> Array {
+        Array::U16(u)
     }
 }
 
-impl From<Vec<u32>> for Array {
-    fn from(u: Vec<u32>) -> Array {
-        let data = af::Array::new(&u, dim4(u.len()));
-        Array::U32(data.into())
+impl From<ArrayExt<u32>> for Array {
+    fn from(u: ArrayExt<u32>) -> Array {
+        Array::U32(u)
     }
 }
 
-impl From<Vec<u64>> for Array {
-    fn from(u: Vec<u64>) -> Array {
-        let data = af::Array::new(&u, dim4(u.len()));
-        Array::U64(data.into())
+impl From<ArrayExt<u64>> for Array {
+    fn from(u: ArrayExt<u64>) -> Array {
+        Array::U64(u)
+    }
+}
+
+impl<T: af::HasAfEnum> FromIterator<T> for Array
+where
+    Array: From<ArrayExt<T>>,
+{
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let array = ArrayExt::from_iter(iter);
+        Array::from(array)
     }
 }
 
@@ -839,16 +838,16 @@ mod tests {
 
     #[test]
     fn test_get_value() {
-        let arr = Array::from(vec![1, 2, 3]);
+        let arr = Array::from_iter(vec![1, 2, 3]);
         assert_eq!(arr.get_value(1), Number::from(2))
     }
 
     #[test]
     fn test_get() {
-        let arr = Array::from(vec![1, 2, 3]);
+        let arr = Array::from_iter(vec![1, 2, 3]);
         let indices = af::Array::new(&[1, 2], af::Dim4::new(&[2, 1, 1, 1]));
         let actual = arr.get(indices);
-        let expected = Array::from(vec![2, 3]);
+        let expected = Array::from_iter(vec![2, 3]);
         assert_eq!(
             actual.eq(&expected).to_vec(),
             vec![true.into(), true.into()]
@@ -857,10 +856,10 @@ mod tests {
 
     #[test]
     fn test_set() {
-        let mut actual = Array::from(vec![1, 2, 3]);
+        let mut actual: Array = vec![1, 2, 3].into_iter().collect();
         let indices = af::Array::new(&[1, 2], af::Dim4::new(&[2, 1, 1, 1]));
-        actual.set(indices, &Array::from(vec![4, 5])).unwrap();
-        let expected = Array::from(vec![1, 4, 5]);
+        actual.set(indices, &Array::from_iter(vec![4, 5])).unwrap();
+        let expected = Array::from_iter(vec![1, 4, 5]);
         assert_eq!(
             actual.eq(&expected).to_vec(),
             vec![true.into(), true.into(), true.into()]

@@ -1,3 +1,4 @@
+use std::iter::FromIterator;
 use std::ops::*;
 
 use arrayfire as af;
@@ -254,6 +255,14 @@ impl<T: af::HasAfEnum> From<af::Array<T>> for ArrayExt<T> {
 
 impl<T: af::HasAfEnum> From<Vec<T>> for ArrayExt<T> {
     fn from(values: Vec<T>) -> ArrayExt<T> {
+        let dim = dim4(values.len());
+        ArrayExt(af::Array::new(&values, dim))
+    }
+}
+
+impl<T: af::HasAfEnum> FromIterator<T> for ArrayExt<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let values = Vec::from_iter(iter);
         let dim = dim4(values.len());
         ArrayExt(af::Array::new(&values, dim))
     }
