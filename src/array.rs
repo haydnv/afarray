@@ -642,6 +642,41 @@ impl AddAssign for Array {
     }
 }
 
+impl Sub for &Array {
+    type Output = Array;
+
+    fn sub(self, other: &Array) -> Self::Output {
+        use Array::*;
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l - r),
+            (C32(l), C32(r)) => C32(l - r),
+            (C64(l), C64(r)) => C64(l - r),
+            (F32(l), F32(r)) => F32(l - r),
+            (F64(l), F64(r)) => F64(l - r),
+            (I16(l), I16(r)) => I16(l - r),
+            (I32(l), I32(r)) => I32(l - r),
+            (I64(l), I64(r)) => I64(l - r),
+            (U8(l), U8(r)) => U8(l - r),
+            (U16(l), U16(r)) => U16(l - r),
+            (U32(l), U32(r)) => U32(l - r),
+            (U64(l), U64(r)) => U64(l - r),
+            (l, r) => {
+                let dtype = Ord::max(l.dtype(), r.dtype());
+                let l = l.cast_into(dtype);
+                let r = r.cast_into(dtype);
+                &l - &r
+            }
+        }
+    }
+}
+
+impl SubAssign for Array {
+    fn sub_assign(&mut self, other: Self) {
+        let diff = &*self - &other;
+        *self = diff;
+    }
+}
+
 impl Mul for &Array {
     type Output = Array;
 
@@ -677,6 +712,40 @@ impl MulAssign for Array {
     }
 }
 
+impl Div for &Array {
+    type Output = Array;
+
+    fn div(self, other: &Array) -> Self::Output {
+        use Array::*;
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l / r),
+            (C32(l), C32(r)) => C32(l / r),
+            (C64(l), C64(r)) => C64(l / r),
+            (F32(l), F32(r)) => F32(l / r),
+            (F64(l), F64(r)) => F64(l / r),
+            (I16(l), I16(r)) => I16(l / r),
+            (I32(l), I32(r)) => I32(l / r),
+            (I64(l), I64(r)) => I64(l / r),
+            (U8(l), U8(r)) => U8(l / r),
+            (U16(l), U16(r)) => U16(l / r),
+            (U32(l), U32(r)) => U32(l / r),
+            (U64(l), U64(r)) => U64(l / r),
+            (l, r) => {
+                let dtype = Ord::max(l.dtype(), r.dtype());
+                let l = l.cast_into(dtype);
+                let r = r.cast_into(dtype);
+                &l / &r
+            }
+        }
+    }
+}
+
+impl DivAssign for Array {
+    fn div_assign(&mut self, other: Array) {
+        let div = &*self / &other;
+        *self = div;
+    }
+}
 impl<T: af::HasAfEnum> CastFrom<Array> for ArrayExt<T> {
     fn cast_from(array: Array) -> ArrayExt<T> {
         use Array::*;
