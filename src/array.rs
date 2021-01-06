@@ -25,21 +25,21 @@ pub enum Array {
 }
 
 impl Array {
-    fn af_cast<T: af::HasAfEnum>(&self) -> ArrayExt<T> {
+    fn cast_inner<T: af::HasAfEnum>(&self) -> ArrayExt<T> {
         use Array::*;
         match self {
-            Bool(b) => b.as_type(),
-            C32(c) => c.as_type(),
-            C64(c) => c.as_type(),
-            F32(f) => f.as_type(),
-            F64(f) => f.as_type(),
-            I16(i) => i.as_type(),
-            I32(i) => i.as_type(),
-            I64(i) => i.as_type(),
-            U8(u) => u.as_type(),
-            U16(u) => u.as_type(),
-            U32(u) => u.as_type(),
-            U64(u) => u.as_type(),
+            Bool(b) => b.cast_to(),
+            C32(c) => c.cast_to(),
+            C64(c) => c.cast_to(),
+            F32(f) => f.cast_to(),
+            F64(f) => f.cast_to(),
+            I16(i) => i.cast_to(),
+            I32(i) => i.cast_to(),
+            I64(i) => i.cast_to(),
+            U8(u) => u.cast_to(),
+            U16(u) => u.cast_to(),
+            U32(u) => u.cast_to(),
+            U64(u) => u.cast_to(),
         }
     }
 
@@ -86,45 +86,6 @@ impl Array {
         }
     }
 
-    pub fn try_cast_from<N>(values: Vec<N>, dtype: NumberType) -> Result<Array>
-    where
-        Number: From<N>,
-    {
-        const UNSUPPORTED: &str = "Array requires a uniform type of Number";
-        let values = values.into_iter().map(Number::from);
-
-        use Array::*;
-        let chunk = match dtype {
-            NumberType::Bool => Bool(vec_cast_into(values).into()),
-            NumberType::Complex(c) => match c {
-                ComplexType::C32 => C32(vec_cast_into(values).into()),
-                ComplexType::C64 => C32(vec_cast_into(values).into()),
-                ComplexType::Complex => return Err(error(UNSUPPORTED)),
-            },
-            NumberType::Float(f) => match f {
-                FloatType::F32 => F32(vec_cast_into(values).into()),
-                FloatType::F64 => F32(vec_cast_into(values).into()),
-                FloatType::Float => return Err(error(UNSUPPORTED)),
-            },
-            NumberType::Int(i) => match i {
-                IntType::I16 => I16(vec_cast_into(values).into()),
-                IntType::I32 => I32(vec_cast_into(values).into()),
-                IntType::I64 => I64(vec_cast_into(values).into()),
-                IntType::Int => return Err(error(UNSUPPORTED)),
-            },
-            NumberType::UInt(u) => match u {
-                UIntType::U8 => U8(vec_cast_into(values).into()),
-                UIntType::U16 => U16(vec_cast_into(values).into()),
-                UIntType::U32 => U32(vec_cast_into(values).into()),
-                UIntType::U64 => U64(vec_cast_into(values).into()),
-                UIntType::UInt => return Err(error(UNSUPPORTED)),
-            },
-            NumberType::Number => return Err(error(UNSUPPORTED)),
-        };
-
-        Ok(chunk)
-    }
-
     pub fn dtype(&self) -> NumberType {
         use Array::*;
         match self {
@@ -143,11 +104,7 @@ impl Array {
         }
     }
 
-    pub fn into_af_array<T: af::HasAfEnum + Default>(self) -> af::Array<T> {
-        self.af_cast().into_inner()
-    }
-
-    pub fn into_type(self, dtype: NumberType) -> Array {
+    pub fn cast_into(self, dtype: NumberType) -> Array {
         use ComplexType as CT;
         use FloatType as FT;
         use IntType as IT;
@@ -155,49 +112,49 @@ impl Array {
         use UIntType as UT;
 
         match dtype {
-            NT::Bool => Self::Bool(self.af_cast()),
+            NT::Bool => Self::Bool(self.cast_inner()),
             NT::Complex(ct) => match ct {
-                CT::C32 => Self::C32(self.af_cast()),
-                CT::C64 => Self::C64(self.af_cast()),
-                CT::Complex => Self::C64(self.af_cast()),
+                CT::C32 => Self::C32(self.cast_inner()),
+                CT::C64 => Self::C64(self.cast_inner()),
+                CT::Complex => Self::C64(self.cast_inner()),
             },
             NT::Float(ft) => match ft {
-                FT::F32 => Self::F32(self.af_cast()),
-                FT::F64 => Self::F64(self.af_cast()),
-                FT::Float => Self::F64(self.af_cast()),
+                FT::F32 => Self::F32(self.cast_inner()),
+                FT::F64 => Self::F64(self.cast_inner()),
+                FT::Float => Self::F64(self.cast_inner()),
             },
             NT::Int(it) => match it {
-                IT::I16 => Self::I16(self.af_cast()),
-                IT::I32 => Self::I32(self.af_cast()),
-                IT::I64 => Self::I64(self.af_cast()),
-                IT::Int => Self::I64(self.af_cast()),
+                IT::I16 => Self::I16(self.cast_inner()),
+                IT::I32 => Self::I32(self.cast_inner()),
+                IT::I64 => Self::I64(self.cast_inner()),
+                IT::Int => Self::I64(self.cast_inner()),
             },
             NT::UInt(ut) => match ut {
-                UT::U8 => Self::U8(self.af_cast()),
-                UT::U16 => Self::U16(self.af_cast()),
-                UT::U32 => Self::U32(self.af_cast()),
-                UT::U64 => Self::U64(self.af_cast()),
-                UT::UInt => Self::U64(self.af_cast()),
+                UT::U8 => Self::U8(self.cast_inner()),
+                UT::U16 => Self::U16(self.cast_inner()),
+                UT::U32 => Self::U32(self.cast_inner()),
+                UT::U64 => Self::U64(self.cast_inner()),
+                UT::UInt => Self::U64(self.cast_inner()),
             },
             NT::Number => self,
         }
     }
 
-    pub fn into_values(self) -> Vec<Number> {
+    pub fn to_vec(&self) -> Vec<Number> {
         use Array::*;
         match self {
-            Bool(b) => b.into(),
-            C32(c) => c.into(),
-            C64(c) => c.into(),
-            F32(f) => f.into(),
-            F64(f) => f.into(),
-            I16(i) => i.into(),
-            I32(i) => i.into(),
-            I64(i) => i.into(),
-            U8(u) => u.into(),
-            U16(u) => u.into(),
-            U32(u) => u.into(),
-            U64(u) => u.into(),
+            Bool(b) => b.to_vec().into_iter().map(Number::from).collect(),
+            C32(c) => c.to_vec().into_iter().map(Number::from).collect(),
+            C64(c) => c.to_vec().into_iter().map(Number::from).collect(),
+            F32(f) => f.to_vec().into_iter().map(Number::from).collect(),
+            F64(f) => f.to_vec().into_iter().map(Number::from).collect(),
+            I16(i) => i.to_vec().into_iter().map(Number::from).collect(),
+            I32(i) => i.to_vec().into_iter().map(Number::from).collect(),
+            I64(i) => i.to_vec().into_iter().map(Number::from).collect(),
+            U8(u) => u.to_vec().into_iter().map(Number::from).collect(),
+            U16(u) => u.to_vec().into_iter().map(Number::from).collect(),
+            U32(u) => u.to_vec().into_iter().map(Number::from).collect(),
+            U64(u) => u.to_vec().into_iter().map(Number::from).collect(),
         }
     }
 
@@ -252,98 +209,98 @@ impl Array {
     }
 
     pub fn and(&self, other: &Array) -> Array {
-        let this: ArrayExt<bool> = self.af_cast();
-        let that: ArrayExt<bool> = other.af_cast();
+        let this: ArrayExt<bool> = self.cast_inner();
+        let that: ArrayExt<bool> = other.cast_inner();
         Array::Bool(this.and(&that))
     }
 
     pub fn eq(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.eq(&other.af_cast())),
-            C32(l) => Bool(l.eq(&other.af_cast())),
-            C64(l) => Bool(l.eq(&other.af_cast())),
-            F32(l) => Bool(l.eq(&other.af_cast())),
-            F64(l) => Bool(l.eq(&other.af_cast())),
-            I16(l) => Bool(l.eq(&other.af_cast())),
-            I32(l) => Bool(l.eq(&other.af_cast())),
-            I64(l) => Bool(l.eq(&other.af_cast())),
-            U8(l) => Bool(l.eq(&other.af_cast())),
-            U16(l) => Bool(l.eq(&other.af_cast())),
-            U32(l) => Bool(l.eq(&other.af_cast())),
-            U64(l) => Bool(l.eq(&other.af_cast())),
+            Bool(l) => Bool(l.eq(&other.cast_inner())),
+            C32(l) => Bool(l.eq(&other.cast_inner())),
+            C64(l) => Bool(l.eq(&other.cast_inner())),
+            F32(l) => Bool(l.eq(&other.cast_inner())),
+            F64(l) => Bool(l.eq(&other.cast_inner())),
+            I16(l) => Bool(l.eq(&other.cast_inner())),
+            I32(l) => Bool(l.eq(&other.cast_inner())),
+            I64(l) => Bool(l.eq(&other.cast_inner())),
+            U8(l) => Bool(l.eq(&other.cast_inner())),
+            U16(l) => Bool(l.eq(&other.cast_inner())),
+            U32(l) => Bool(l.eq(&other.cast_inner())),
+            U64(l) => Bool(l.eq(&other.cast_inner())),
         }
     }
 
     pub fn gt(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.gt(&other.af_cast())),
-            C32(l) => Bool(l.gt(&other.af_cast())),
-            C64(l) => Bool(l.gt(&other.af_cast())),
-            F32(l) => Bool(l.gt(&other.af_cast())),
-            F64(l) => Bool(l.gt(&other.af_cast())),
-            I16(l) => Bool(l.gt(&other.af_cast())),
-            I32(l) => Bool(l.gt(&other.af_cast())),
-            I64(l) => Bool(l.gt(&other.af_cast())),
-            U8(l) => Bool(l.gt(&other.af_cast())),
-            U16(l) => Bool(l.gt(&other.af_cast())),
-            U32(l) => Bool(l.gt(&other.af_cast())),
-            U64(l) => Bool(l.gt(&other.af_cast())),
+            Bool(l) => Bool(l.gt(&other.cast_inner())),
+            C32(l) => Bool(l.gt(&other.cast_inner())),
+            C64(l) => Bool(l.gt(&other.cast_inner())),
+            F32(l) => Bool(l.gt(&other.cast_inner())),
+            F64(l) => Bool(l.gt(&other.cast_inner())),
+            I16(l) => Bool(l.gt(&other.cast_inner())),
+            I32(l) => Bool(l.gt(&other.cast_inner())),
+            I64(l) => Bool(l.gt(&other.cast_inner())),
+            U8(l) => Bool(l.gt(&other.cast_inner())),
+            U16(l) => Bool(l.gt(&other.cast_inner())),
+            U32(l) => Bool(l.gt(&other.cast_inner())),
+            U64(l) => Bool(l.gt(&other.cast_inner())),
         }
     }
 
     pub fn gte(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.gte(&other.af_cast())),
-            C32(l) => Bool(l.gte(&other.af_cast())),
-            C64(l) => Bool(l.gte(&other.af_cast())),
-            F32(l) => Bool(l.gte(&other.af_cast())),
-            F64(l) => Bool(l.gte(&other.af_cast())),
-            I16(l) => Bool(l.gte(&other.af_cast())),
-            I32(l) => Bool(l.gte(&other.af_cast())),
-            I64(l) => Bool(l.gte(&other.af_cast())),
-            U8(l) => Bool(l.gte(&other.af_cast())),
-            U16(l) => Bool(l.gte(&other.af_cast())),
-            U32(l) => Bool(l.gte(&other.af_cast())),
-            U64(l) => Bool(l.gte(&other.af_cast())),
+            Bool(l) => Bool(l.gte(&other.cast_inner())),
+            C32(l) => Bool(l.gte(&other.cast_inner())),
+            C64(l) => Bool(l.gte(&other.cast_inner())),
+            F32(l) => Bool(l.gte(&other.cast_inner())),
+            F64(l) => Bool(l.gte(&other.cast_inner())),
+            I16(l) => Bool(l.gte(&other.cast_inner())),
+            I32(l) => Bool(l.gte(&other.cast_inner())),
+            I64(l) => Bool(l.gte(&other.cast_inner())),
+            U8(l) => Bool(l.gte(&other.cast_inner())),
+            U16(l) => Bool(l.gte(&other.cast_inner())),
+            U32(l) => Bool(l.gte(&other.cast_inner())),
+            U64(l) => Bool(l.gte(&other.cast_inner())),
         }
     }
 
     pub fn lt(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.lt(&other.af_cast())),
-            C32(l) => Bool(l.lt(&other.af_cast())),
-            C64(l) => Bool(l.lt(&other.af_cast())),
-            F32(l) => Bool(l.lt(&other.af_cast())),
-            F64(l) => Bool(l.lt(&other.af_cast())),
-            I16(l) => Bool(l.lt(&other.af_cast())),
-            I32(l) => Bool(l.lt(&other.af_cast())),
-            I64(l) => Bool(l.lt(&other.af_cast())),
-            U8(l) => Bool(l.lt(&other.af_cast())),
-            U16(l) => Bool(l.lt(&other.af_cast())),
-            U32(l) => Bool(l.lt(&other.af_cast())),
-            U64(l) => Bool(l.lt(&other.af_cast())),
+            Bool(l) => Bool(l.lt(&other.cast_inner())),
+            C32(l) => Bool(l.lt(&other.cast_inner())),
+            C64(l) => Bool(l.lt(&other.cast_inner())),
+            F32(l) => Bool(l.lt(&other.cast_inner())),
+            F64(l) => Bool(l.lt(&other.cast_inner())),
+            I16(l) => Bool(l.lt(&other.cast_inner())),
+            I32(l) => Bool(l.lt(&other.cast_inner())),
+            I64(l) => Bool(l.lt(&other.cast_inner())),
+            U8(l) => Bool(l.lt(&other.cast_inner())),
+            U16(l) => Bool(l.lt(&other.cast_inner())),
+            U32(l) => Bool(l.lt(&other.cast_inner())),
+            U64(l) => Bool(l.lt(&other.cast_inner())),
         }
     }
 
     pub fn lte(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.lte(&other.af_cast())),
-            C32(l) => Bool(l.lte(&other.af_cast())),
-            C64(l) => Bool(l.lte(&other.af_cast())),
-            F32(l) => Bool(l.lte(&other.af_cast())),
-            F64(l) => Bool(l.lte(&other.af_cast())),
-            I16(l) => Bool(l.lte(&other.af_cast())),
-            I32(l) => Bool(l.lte(&other.af_cast())),
-            I64(l) => Bool(l.lte(&other.af_cast())),
-            U8(l) => Bool(l.lte(&other.af_cast())),
-            U16(l) => Bool(l.lte(&other.af_cast())),
-            U32(l) => Bool(l.lte(&other.af_cast())),
-            U64(l) => Bool(l.lte(&other.af_cast())),
+            Bool(l) => Bool(l.lte(&other.cast_inner())),
+            C32(l) => Bool(l.lte(&other.cast_inner())),
+            C64(l) => Bool(l.lte(&other.cast_inner())),
+            F32(l) => Bool(l.lte(&other.cast_inner())),
+            F64(l) => Bool(l.lte(&other.cast_inner())),
+            I16(l) => Bool(l.lte(&other.cast_inner())),
+            I32(l) => Bool(l.lte(&other.cast_inner())),
+            I64(l) => Bool(l.lte(&other.cast_inner())),
+            U8(l) => Bool(l.lte(&other.cast_inner())),
+            U16(l) => Bool(l.lte(&other.cast_inner())),
+            U32(l) => Bool(l.lte(&other.cast_inner())),
+            U64(l) => Bool(l.lte(&other.cast_inner())),
         }
     }
 
@@ -351,29 +308,29 @@ impl Array {
         use Array::*;
 
         match self {
-            Bool(l) => Bool(l.ne(&other.af_cast())),
-            C32(l) => Bool(l.ne(&other.af_cast())),
-            C64(l) => Bool(l.ne(&other.af_cast())),
-            F32(l) => Bool(l.ne(&other.af_cast())),
-            F64(l) => Bool(l.ne(&other.af_cast())),
-            I16(l) => Bool(l.ne(&other.af_cast())),
-            I32(l) => Bool(l.ne(&other.af_cast())),
-            I64(l) => Bool(l.ne(&other.af_cast())),
-            U8(l) => Bool(l.ne(&other.af_cast())),
-            U16(l) => Bool(l.ne(&other.af_cast())),
-            U32(l) => Bool(l.ne(&other.af_cast())),
-            U64(l) => Bool(l.ne(&other.af_cast())),
+            Bool(l) => Bool(l.ne(&other.cast_inner())),
+            C32(l) => Bool(l.ne(&other.cast_inner())),
+            C64(l) => Bool(l.ne(&other.cast_inner())),
+            F32(l) => Bool(l.ne(&other.cast_inner())),
+            F64(l) => Bool(l.ne(&other.cast_inner())),
+            I16(l) => Bool(l.ne(&other.cast_inner())),
+            I32(l) => Bool(l.ne(&other.cast_inner())),
+            I64(l) => Bool(l.ne(&other.cast_inner())),
+            U8(l) => Bool(l.ne(&other.cast_inner())),
+            U16(l) => Bool(l.ne(&other.cast_inner())),
+            U32(l) => Bool(l.ne(&other.cast_inner())),
+            U64(l) => Bool(l.ne(&other.cast_inner())),
         }
     }
 
     pub fn not(&self) -> Array {
-        let this: ArrayExt<bool> = self.af_cast();
+        let this: ArrayExt<bool> = self.cast_inner();
         Array::Bool(this.not())
     }
 
     pub fn or(&self, other: &Array) -> Array {
-        let this: ArrayExt<bool> = self.af_cast();
-        let that: ArrayExt<bool> = other.af_cast();
+        let this: ArrayExt<bool> = self.cast_inner();
+        let that: ArrayExt<bool> = other.cast_inner();
         Array::Bool(this.or(&that))
     }
 
@@ -540,18 +497,18 @@ impl Array {
     fn set_at(&mut self, index: af::Indexer, value: &Array) -> Result<()> {
         use Array::*;
         match self {
-            Bool(l) => l.set(&index, &value.af_cast()),
-            C32(l) => l.set(&index, &value.af_cast()),
-            C64(l) => l.set(&index, &value.af_cast()),
-            F32(l) => l.set(&index, &value.af_cast()),
-            F64(l) => l.set(&index, &value.af_cast()),
-            I16(l) => l.set(&index, &value.af_cast()),
-            I32(l) => l.set(&index, &value.af_cast()),
-            I64(l) => l.set(&index, &value.af_cast()),
-            U8(l) => l.set(&index, &value.af_cast()),
-            U16(l) => l.set(&index, &value.af_cast()),
-            U32(l) => l.set(&index, &value.af_cast()),
-            U64(l) => l.set(&index, &value.af_cast()),
+            Bool(l) => l.set(&index, &value.cast_inner()),
+            C32(l) => l.set(&index, &value.cast_inner()),
+            C64(l) => l.set(&index, &value.cast_inner()),
+            F32(l) => l.set(&index, &value.cast_inner()),
+            F64(l) => l.set(&index, &value.cast_inner()),
+            I16(l) => l.set(&index, &value.cast_inner()),
+            I32(l) => l.set(&index, &value.cast_inner()),
+            I64(l) => l.set(&index, &value.cast_inner()),
+            U8(l) => l.set(&index, &value.cast_inner()),
+            U16(l) => l.set(&index, &value.cast_inner()),
+            U32(l) => l.set(&index, &value.cast_inner()),
+            U64(l) => l.set(&index, &value.cast_inner()),
         }
 
         Ok(())
@@ -643,8 +600,8 @@ impl Array {
     }
 
     pub fn xor(&self, other: &Array) -> Array {
-        let this: ArrayExt<bool> = self.af_cast();
-        let that: ArrayExt<bool> = other.af_cast();
+        let this: ArrayExt<bool> = self.cast_inner();
+        let that: ArrayExt<bool> = other.cast_inner();
         Array::Bool(this.xor(&that))
     }
 }
@@ -662,31 +619,31 @@ impl Add for &Array {
         use UIntType as UT;
 
         match dtype {
-            NT::Bool => Array::Bool(&self.af_cast::<bool>() + &other.af_cast()),
+            NT::Bool => Array::Bool(&self.cast_inner::<bool>() + &other.cast_inner()),
             NT::Complex(ct) => match ct {
-                CT::C32 => Array::C32(&self.af_cast::<_Complex<f32>>() + &other.af_cast()),
-                CT::C64 => Array::C64(&self.af_cast::<_Complex<f64>>() + &other.af_cast()),
-                CT::Complex => {
-                    Array::C64(&self.af_cast::<_Complex<f64>>() + &other.af_cast::<_Complex<f64>>())
-                }
+                CT::C32 => Array::C32(&self.cast_inner::<_Complex<f32>>() + &other.cast_inner()),
+                CT::C64 => Array::C64(&self.cast_inner::<_Complex<f64>>() + &other.cast_inner()),
+                CT::Complex => Array::C64(
+                    &self.cast_inner::<_Complex<f64>>() + &other.cast_inner::<_Complex<f64>>(),
+                ),
             },
             NT::Float(ft) => match ft {
-                FT::F32 => Array::F32(&self.af_cast::<f32>() + &other.af_cast()),
-                FT::F64 => Array::F64(&self.af_cast::<f64>() + &other.af_cast()),
-                FT::Float => Array::F64(&self.af_cast::<f64>() + &other.af_cast::<f64>()),
+                FT::F32 => Array::F32(&self.cast_inner::<f32>() + &other.cast_inner()),
+                FT::F64 => Array::F64(&self.cast_inner::<f64>() + &other.cast_inner()),
+                FT::Float => Array::F64(&self.cast_inner::<f64>() + &other.cast_inner::<f64>()),
             },
             NT::Int(it) => match it {
-                IT::I16 => Array::I16(&self.af_cast::<i16>() + &other.af_cast()),
-                IT::I32 => Array::I32(&self.af_cast::<i32>() + &other.af_cast()),
-                IT::I64 => Array::I64(&self.af_cast::<i64>() + &other.af_cast()),
-                IT::Int => Array::I64(&self.af_cast::<i64>() + &other.af_cast::<i64>()),
+                IT::I16 => Array::I16(&self.cast_inner::<i16>() + &other.cast_inner()),
+                IT::I32 => Array::I32(&self.cast_inner::<i32>() + &other.cast_inner()),
+                IT::I64 => Array::I64(&self.cast_inner::<i64>() + &other.cast_inner()),
+                IT::Int => Array::I64(&self.cast_inner::<i64>() + &other.cast_inner::<i64>()),
             },
             NT::UInt(ut) => match ut {
-                UT::U8 => Array::U8(&self.af_cast::<u8>() + &other.af_cast()),
-                UT::U16 => Array::U16(&self.af_cast::<u16>() + &other.af_cast()),
-                UT::U32 => Array::U32(&self.af_cast::<u32>() + &other.af_cast()),
-                UT::U64 => Array::U64(&self.af_cast::<u64>() + &other.af_cast()),
-                UT::UInt => Array::U64(&self.af_cast::<u64>() + &other.af_cast::<u64>()),
+                UT::U8 => Array::U8(&self.cast_inner::<u8>() + &other.cast_inner()),
+                UT::U16 => Array::U16(&self.cast_inner::<u16>() + &other.cast_inner()),
+                UT::U32 => Array::U32(&self.cast_inner::<u32>() + &other.cast_inner()),
+                UT::U64 => Array::U64(&self.cast_inner::<u64>() + &other.cast_inner()),
+                UT::UInt => Array::U64(&self.cast_inner::<u64>() + &other.cast_inner::<u64>()),
             },
             NT::Number => panic!("Array does not support generic type Number"),
         }
@@ -713,31 +670,31 @@ impl Mul for &Array {
         use UIntType as UT;
 
         match dtype {
-            NT::Bool => Array::Bool(&self.af_cast::<bool>() * &other.af_cast()),
+            NT::Bool => Array::Bool(&self.cast_inner::<bool>() * &other.cast_inner()),
             NT::Complex(ct) => match ct {
-                CT::C32 => Array::C32(&self.af_cast::<_Complex<f32>>() * &other.af_cast()),
-                CT::C64 => Array::C64(&self.af_cast::<_Complex<f64>>() * &other.af_cast()),
-                CT::Complex => {
-                    Array::C64(&self.af_cast::<_Complex<f64>>() * &other.af_cast::<_Complex<f64>>())
-                }
+                CT::C32 => Array::C32(&self.cast_inner::<_Complex<f32>>() * &other.cast_inner()),
+                CT::C64 => Array::C64(&self.cast_inner::<_Complex<f64>>() * &other.cast_inner()),
+                CT::Complex => Array::C64(
+                    &self.cast_inner::<_Complex<f64>>() * &other.cast_inner::<_Complex<f64>>(),
+                ),
             },
             NT::Float(ft) => match ft {
-                FT::F32 => Array::F32(&self.af_cast::<f32>() * &other.af_cast()),
-                FT::F64 => Array::F64(&self.af_cast::<f64>() * &other.af_cast()),
-                FT::Float => Array::F64(&self.af_cast::<f64>() * &other.af_cast::<f64>()),
+                FT::F32 => Array::F32(&self.cast_inner::<f32>() * &other.cast_inner()),
+                FT::F64 => Array::F64(&self.cast_inner::<f64>() * &other.cast_inner()),
+                FT::Float => Array::F64(&self.cast_inner::<f64>() * &other.cast_inner::<f64>()),
             },
             NT::Int(it) => match it {
-                IT::I16 => Array::I16(&self.af_cast::<i16>() * &other.af_cast()),
-                IT::I32 => Array::I32(&self.af_cast::<i32>() * &other.af_cast()),
-                IT::I64 => Array::I64(&self.af_cast::<i64>() * &other.af_cast()),
-                IT::Int => Array::I64(&self.af_cast::<i64>() * &other.af_cast::<i64>()),
+                IT::I16 => Array::I16(&self.cast_inner::<i16>() * &other.cast_inner()),
+                IT::I32 => Array::I32(&self.cast_inner::<i32>() * &other.cast_inner()),
+                IT::I64 => Array::I64(&self.cast_inner::<i64>() * &other.cast_inner()),
+                IT::Int => Array::I64(&self.cast_inner::<i64>() * &other.cast_inner::<i64>()),
             },
             NT::UInt(ut) => match ut {
-                UT::U8 => Array::U8(&self.af_cast::<u8>() * &other.af_cast()),
-                UT::U16 => Array::U16(&self.af_cast::<u16>() * &other.af_cast()),
-                UT::U32 => Array::U32(&self.af_cast::<u32>() * &other.af_cast()),
-                UT::U64 => Array::U64(&self.af_cast::<u64>() * &other.af_cast()),
-                UT::UInt => Array::U64(&self.af_cast::<u64>() * &other.af_cast::<u64>()),
+                UT::U8 => Array::U8(&self.cast_inner::<u8>() * &other.cast_inner()),
+                UT::U16 => Array::U16(&self.cast_inner::<u16>() * &other.cast_inner()),
+                UT::U32 => Array::U32(&self.cast_inner::<u32>() * &other.cast_inner()),
+                UT::U64 => Array::U64(&self.cast_inner::<u64>() * &other.cast_inner()),
+                UT::UInt => Array::U64(&self.cast_inner::<u64>() * &other.cast_inner::<u64>()),
             },
             NT::Number => panic!("Array does not support generic type Number"),
         }
@@ -748,6 +705,26 @@ impl MulAssign for Array {
     fn mul_assign(&mut self, other: Array) {
         let product = &*self * &other;
         *self = product;
+    }
+}
+
+impl<T: af::HasAfEnum> CastFrom<Array> for ArrayExt<T> {
+    fn cast_from(array: Array) -> ArrayExt<T> {
+        use Array::*;
+        match array {
+            Bool(b) => b.cast_to(),
+            C32(c) => c.cast_to(),
+            C64(c) => c.cast_to(),
+            F32(f) => f.cast_to(),
+            F64(f) => f.cast_to(),
+            I16(i) => i.cast_to(),
+            I32(i) => i.cast_to(),
+            I64(i) => i.cast_to(),
+            U8(u) => u.cast_to(),
+            U16(u) => u.cast_to(),
+            U32(u) => u.cast_to(),
+            U64(u) => u.cast_to(),
+        }
     }
 }
 
@@ -835,26 +812,6 @@ impl From<Vec<u64>> for Array {
     }
 }
 
-impl From<Array> for Vec<Number> {
-    fn from(chunk: Array) -> Vec<Number> {
-        use Array::*;
-        match chunk {
-            Bool(b) => b.into(),
-            C32(c) => c.into(),
-            C64(c) => c.into(),
-            F32(f) => f.into(),
-            F64(f) => f.into(),
-            I16(i) => i.into(),
-            I32(i) => i.into(),
-            I64(i) => i.into(),
-            U8(u) => u.into(),
-            U16(u) => u.into(),
-            U32(u) => u.into(),
-            U64(u) => u.into(),
-        }
-    }
-}
-
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let dtype = match self {
@@ -876,10 +833,6 @@ impl fmt::Display for Array {
     }
 }
 
-fn vec_cast_into<I: Iterator<Item = S>, D: CastFrom<S>, S>(source: I) -> Vec<D> {
-    source.map(D::cast_from).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -897,7 +850,7 @@ mod tests {
         let actual = arr.get(indices);
         let expected = Array::from(vec![2, 3]);
         assert_eq!(
-            actual.eq(&expected).into_values(),
+            actual.eq(&expected).to_vec(),
             vec![true.into(), true.into()]
         )
     }
@@ -909,7 +862,7 @@ mod tests {
         actual.set(indices, &Array::from(vec![4, 5])).unwrap();
         let expected = Array::from(vec![1, 4, 5]);
         assert_eq!(
-            actual.eq(&expected).into_values(),
+            actual.eq(&expected).to_vec(),
             vec![true.into(), true.into(), true.into()]
         )
     }

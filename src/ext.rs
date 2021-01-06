@@ -1,7 +1,6 @@
 use std::ops::*;
 
 use arrayfire as af;
-use number_general::*;
 
 use super::{_Complex, dim4};
 
@@ -14,16 +13,16 @@ pub trait ArrayInstance {
 
     fn af_mut(&'_ mut self) -> &'_ mut af::Array<Self::DType>;
 
+    fn af_cast<T: af::HasAfEnum>(&self) -> af::Array<T> {
+        self.af().cast()
+    }
+
     fn len(&self) -> usize {
         self.af().elements()
     }
 
-    fn as_type<T: af::HasAfEnum>(&self) -> ArrayExt<T> {
-        ArrayExt(self.af().cast())
-    }
-
-    fn get(&self, index: af::Indexer) -> ArrayExt<Self::DType> {
-        ArrayExt(af::index_gen(self.af(), index))
+    fn get(&self, index: af::Indexer) -> af::Array<Self::DType> {
+        af::index_gen(self.af(), index)
     }
 
     fn set<T: ArrayInstance<DType = Self::DType>>(&mut self, index: &af::Indexer, other: &T) {
@@ -34,6 +33,15 @@ pub trait ArrayInstance {
         let seq = af::Seq::new(offset as f32, offset as f32, 1.0f32);
         af::assign_seq(self.af_mut(), &[seq], &af::Array::new(&[value], dim4(1)));
     }
+
+    fn to_vec(&self) -> Vec<Self::DType>
+    where
+        Self::DType: Clone + Default,
+    {
+        let mut v = vec![Self::DType::default(); self.len()];
+        self.af().host(&mut v);
+        v
+    }
 }
 
 #[derive(Clone)]
@@ -42,6 +50,14 @@ pub struct ArrayExt<T: af::HasAfEnum>(af::Array<T>);
 impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     pub fn concatenate(left: &ArrayExt<T>, right: &ArrayExt<T>) -> ArrayExt<T> {
         af::join(0, left.af(), right.af()).into()
+    }
+
+    pub fn cast_to<D: af::HasAfEnum>(&self) -> ArrayExt<D> {
+        ArrayExt(self.af_cast())
+    }
+
+    pub fn get(&self, index: af::Indexer) -> Self {
+        Self(ArrayInstance::get(self, index))
     }
 
     pub fn get_value(&self, index: usize) -> T {
@@ -130,108 +146,103 @@ impl<T: af::HasAfEnum> ArrayInstance for ArrayExt<T> {
     }
 }
 
-impl<T: af::HasAfEnum + Clone + Default> From<ArrayExt<T>> for Vec<T> {
-    fn from(array: ArrayExt<T>) -> Vec<T> {
-        let len = array.0.elements();
-        let mut v = vec![T::default(); len];
-        array.0.host(&mut v);
-        v
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Add for &ArrayExt<T>
+    where
+        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
+
+    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
+
+    fn add(self, other: Self) -> Self::Output {
+        ArrayExt(af::add(&self.0, &other.0, BATCH))
     }
 }
 
-impl From<ArrayExt<bool>> for Vec<Number> {
-    fn from(array: ArrayExt<bool>) -> Vec<Number> {
-        let array: Vec<bool> = array.into();
-        let array: Vec<Boolean> = vec_into(array);
-        vec_into(array)
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> AddAssign for ArrayExt<T>
+    where
+        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
+
+    fn add_assign(&mut self, other: Self) {
+        let sum = &*self + &other;
+        *self = sum.cast_to();
     }
 }
 
-impl From<ArrayExt<_Complex<f32>>> for Vec<Number> {
-    fn from(array: ArrayExt<_Complex<f32>>) -> Vec<Number> {
-        let array: Vec<_Complex<f32>> = array.into();
-        let array: Vec<Complex> = vec_into(array);
-        vec_into(array)
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Sub for &ArrayExt<T>
+    where
+        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
+
+    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
+
+    fn sub(self, other: Self) -> Self::Output {
+        ArrayExt(af::sub(&self.0, &other.0, BATCH))
     }
 }
 
-impl From<ArrayExt<_Complex<f64>>> for Vec<Number> {
-    fn from(array: ArrayExt<_Complex<f64>>) -> Vec<Number> {
-        let array: Vec<_Complex<f64>> = array.into();
-        let array: Vec<Complex> = vec_into(array);
-        vec_into(array)
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> SubAssign for ArrayExt<T>
+    where
+        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
+
+    fn sub_assign(&mut self, other: Self) {
+        let diff = &*self - &other;
+        *self = diff.cast_to();
     }
 }
 
-impl From<ArrayExt<f32>> for Vec<Number> {
-    fn from(array: ArrayExt<f32>) -> Vec<Number> {
-        let array: Vec<f32> = array.into();
-        let array: Vec<Float> = vec_into(array);
-        vec_into(array)
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Mul for &ArrayExt<T>
+    where
+        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
+
+    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
+
+    fn mul(self, other: Self) -> Self::Output {
+        ArrayExt(af::mul(&self.0, &other.0, BATCH))
     }
 }
 
-impl From<ArrayExt<f64>> for Vec<Number> {
-    fn from(array: ArrayExt<f64>) -> Vec<Number> {
-        let array: Vec<f64> = array.into();
-        let array: Vec<Float> = vec_into(array);
-        vec_into(array)
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> MulAssign for ArrayExt<T>
+    where
+        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
+
+    fn mul_assign(&mut self, other: Self) {
+        let product = &*self * &other;
+        *self = product.cast_to();
     }
 }
 
-impl From<ArrayExt<i16>> for Vec<Number> {
-    fn from(array: ArrayExt<i16>) -> Vec<Number> {
-        let array: Vec<i16> = array.into();
-        let array: Vec<Int> = vec_into(array);
-        vec_into(array)
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Div for &ArrayExt<T>
+    where
+        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
+
+    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
+
+    fn div(self, other: Self) -> Self::Output {
+        ArrayExt(af::div(&self.0, &other.0, BATCH))
     }
 }
 
-impl From<ArrayExt<i32>> for Vec<Number> {
-    fn from(array: ArrayExt<i32>) -> Vec<Number> {
-        let array: Vec<i32> = array.into();
-        let array: Vec<Int> = vec_into(array);
-        vec_into(array)
-    }
-}
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> DivAssign for ArrayExt<T>
+    where
+        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
 
-impl From<ArrayExt<i64>> for Vec<Number> {
-    fn from(array: ArrayExt<i64>) -> Vec<Number> {
-        let array: Vec<i64> = array.into();
-        let array: Vec<Int> = vec_into(array);
-        vec_into(array)
-    }
-}
-
-impl From<ArrayExt<u8>> for Vec<Number> {
-    fn from(array: ArrayExt<u8>) -> Vec<Number> {
-        let array: Vec<u8> = array.into();
-        let array: Vec<UInt> = vec_into(array);
-        vec_into(array)
-    }
-}
-
-impl From<ArrayExt<u16>> for Vec<Number> {
-    fn from(array: ArrayExt<u16>) -> Vec<Number> {
-        let array: Vec<u16> = array.into();
-        let array: Vec<UInt> = vec_into(array);
-        vec_into(array)
-    }
-}
-
-impl From<ArrayExt<u32>> for Vec<Number> {
-    fn from(array: ArrayExt<u32>) -> Vec<Number> {
-        let array: Vec<u32> = array.into();
-        let array: Vec<UInt> = vec_into(array);
-        vec_into(array)
-    }
-}
-
-impl From<ArrayExt<u64>> for Vec<Number> {
-    fn from(array: ArrayExt<u64>) -> Vec<Number> {
-        let array: Vec<u64> = array.into();
-        let array: Vec<UInt> = vec_into(array);
-        vec_into(array)
+    fn div_assign(&mut self, other: Self) {
+        let div = &*self / &other;
+        *self = div.cast_to();
     }
 }
 
@@ -245,106 +256,6 @@ impl<T: af::HasAfEnum> From<Vec<T>> for ArrayExt<T> {
     fn from(values: Vec<T>) -> ArrayExt<T> {
         let dim = dim4(values.len());
         ArrayExt(af::Array::new(&values, dim))
-    }
-}
-
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Add for &ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
-
-    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
-
-    fn add(self, other: Self) -> Self::Output {
-        ArrayExt(af::add(&self.0, &other.0, BATCH))
-    }
-}
-
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> AddAssign for ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
-
-    fn add_assign(&mut self, other: Self) {
-        let sum = &*self + &other;
-        *self = sum.as_type();
-    }
-}
-
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Sub for &ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
-
-    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
-
-    fn sub(self, other: Self) -> Self::Output {
-        ArrayExt(af::sub(&self.0, &other.0, BATCH))
-    }
-}
-
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> SubAssign for ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
-
-    fn sub_assign(&mut self, other: Self) {
-        let diff = &*self - &other;
-        *self = diff.as_type();
-    }
-}
-
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Mul for &ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
-
-    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
-
-    fn mul(self, other: Self) -> Self::Output {
-        ArrayExt(af::mul(&self.0, &other.0, BATCH))
-    }
-}
-
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> MulAssign for ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
-
-    fn mul_assign(&mut self, other: Self) {
-        let product = &*self * &other;
-        *self = product.as_type();
-    }
-}
-
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Div for &ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
-
-    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
-
-    fn div(self, other: Self) -> Self::Output {
-        ArrayExt(af::div(&self.0, &other.0, BATCH))
-    }
-}
-
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> DivAssign for ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
-
-    fn div_assign(&mut self, other: Self) {
-        let div = &*self / &other;
-        *self = div.as_type();
     }
 }
 
@@ -708,11 +619,4 @@ fn coord_bounds(shape: &[u64]) -> Vec<u64> {
     (0..shape.len())
         .map(|axis| shape[axis + 1..].iter().product())
         .collect()
-}
-
-fn vec_into<S, D>(source: Vec<S>) -> Vec<D>
-where
-    D: From<S>,
-{
-    source.into_iter().map(D::from).collect()
 }
