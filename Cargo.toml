@@ -12,5 +12,8 @@ categories = ["algorithms", "data-structures", "hardware-support", "mathematics"
 keywords = ["array", "arrayfire", "gpu", "ndarray", "tensor"]
 
 [dependencies]
-arrayfire = "3.6"
-number-general = "0.1"
+# There is a bug in ArrayFire 3.7 which breaks af::any and af::all. It should be fixed in ArrayFire 3.8.
+arrayfire = "<3.7"
+number-general = {path = "../number-general"}
+num = "0.2"
+safecast = "0.1"
