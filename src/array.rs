@@ -607,6 +607,38 @@ impl Array {
     }
 }
 
+impl PartialEq for Array {
+    fn eq(&self, other: &Array) -> bool {
+        if self.len() != other.len() {
+            return false;
+        }
+
+        use Array::*;
+        let eq = match (self, other) {
+            (Bool(l), Bool(r)) => l.eq(r),
+            (C32(l), C32(r)) => l.eq(r),
+            (C64(l), C64(r)) => l.eq(r),
+            (F32(l), F32(r)) => l.eq(r),
+            (F64(l), F64(r)) => l.eq(r),
+            (I16(l), I16(r)) => l.eq(r),
+            (I32(l), I32(r)) => l.eq(r),
+            (I64(l), I64(r)) => l.eq(r),
+            (U8(l), U8(r)) => l.eq(r),
+            (U16(l), U16(r)) => l.eq(r),
+            (U32(l), U32(r)) => l.eq(r),
+            (U64(l), U64(r)) => l.eq(r),
+            (l, r) => {
+                let dtype = Ord::max(l.dtype(), r.dtype());
+                let l = l.cast_into(dtype);
+                let r = r.cast_into(dtype);
+                return l == r;
+            }
+        };
+
+        eq.all()
+    }
+}
+
 impl Add for &Array {
     type Output = Array;
 
@@ -884,8 +916,7 @@ mod tests {
 
     #[test]
     fn test_get_value() {
-        let arr = Array::from(&[1, 2, 3][..]);
-        assert_eq!(arr.get_value(1), Number::from(2))
+        assert_eq!(Array::from(&[1, 2, 3][..]).get_value(1), Number::from(2));
     }
 
     #[test]
@@ -894,10 +925,7 @@ mod tests {
         let indices = af::Array::new(&[1, 2], af::Dim4::new(&[2, 1, 1, 1]));
         let actual = arr.get(indices);
         let expected = Array::from(&[2, 3][..]);
-        assert_eq!(
-            actual.eq(&expected).to_vec(),
-            vec![true.into(), true.into()]
-        )
+        assert_eq!(actual, expected)
     }
 
     #[test]
@@ -906,9 +934,59 @@ mod tests {
         let indices = af::Array::new(&[1, 2], af::Dim4::new(&[2, 1, 1, 1]));
         actual.set(indices, &Array::from(&[4, 5][..])).unwrap();
         let expected = Array::from(&[1, 4, 5][..]);
-        assert_eq!(
-            actual.eq(&expected).to_vec(),
-            vec![true.into(), true.into(), true.into()]
-        )
+        assert_eq!(actual, expected)
+    }
+
+    #[test]
+    fn test_add() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [1][..].into();
+        assert_eq!(&a + &b, [2, 3, 4][..].into());
+
+        let b: Array = [3, 2, 1][..].into();
+        assert_eq!(&a + &b, [4, 4, 4][..].into());
+    }
+
+    #[test]
+    fn test_sub() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [1][..].into();
+        assert_eq!(&a - &b, [0, 1, 2][..].into());
+
+        let b: Array = [3, 2, 1][..].into();
+        println!("{:?}", (&a - &b).to_vec());
+        assert_eq!(&a - &b, [-2, 0, 2][..].into());
+    }
+
+    #[test]
+    fn test_mul() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [2][..].into();
+        assert_eq!(&a * &b, [2, 4, 6][..].into());
+
+        let b: Array = [5, 4, 3][..].into();
+        assert_eq!(&a * &b, [5, 8, 9][..].into());
+    }
+
+    #[test]
+    fn test_div() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [2.0][..].into();
+        assert_eq!(&a * &b, [0.5, 1.0, 1.5][..].into());
+
+        let b: Array = [-1., -4., 4.][..].into();
+        assert_eq!(&a * &b, [-1., -2., 0.75][..].into());
+    }
+
+    #[test]
+    fn test_sum() {
+        let a: Array = [1, 2, 3, 4][..].into();
+        assert_eq!(a.sum(), 10.into());
+    }
+
+    #[test]
+    fn test_product() {
+        let a: Array = [1, 2, 3, 4][..].into();
+        assert_eq!(a.product(), 24.into());
     }
 }
