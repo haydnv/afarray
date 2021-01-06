@@ -829,24 +829,15 @@ where
     }
 }
 
+impl fmt::Debug for Array {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let dtype = match self {
-            Self::Bool(_) => "Bool",
-            Self::C32(_) => "Complex::C32",
-            Self::C64(_) => "Complex::C64",
-            Self::F32(_) => "Float::F32",
-            Self::F64(_) => "Float::F64",
-            Self::I16(_) => "Int::I16",
-            Self::I32(_) => "Int::I32",
-            Self::I64(_) => "Int::I64",
-            Self::U8(_) => "UInt::U8",
-            Self::U16(_) => "UInt::U16",
-            Self::U32(_) => "UInt::U32",
-            Self::U64(_) => "UInt::U64",
-        };
-
-        write!(f, "ArrayInstance<{}>", dtype)
+        write!(f, "Array<{}>", self.dtype())
     }
 }
 

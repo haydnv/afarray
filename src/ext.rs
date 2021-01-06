@@ -1,3 +1,4 @@
+use std::fmt;
 use std::iter::FromIterator;
 use std::ops::*;
 
@@ -621,6 +622,18 @@ impl ArrayInstanceReduce for ArrayExt<u64> {
 
     fn sum(&self) -> u64 {
         af::sum_all(self.af()).0 as u64
+    }
+}
+
+impl<T: af::HasAfEnum> fmt::Debug for ArrayExt<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+impl<T: af::HasAfEnum> fmt::Display for ArrayExt<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ArrayExt<{}>", std::any::type_name::<T>())
     }
 }
 
