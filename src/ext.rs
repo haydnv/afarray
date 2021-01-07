@@ -3,6 +3,8 @@ use std::iter::FromIterator;
 use std::ops::*;
 
 use arrayfire as af;
+use serde::de::{Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 
 use super::{_Complex, dim4};
 
@@ -601,6 +603,21 @@ impl ArrayInstanceReduce for ArrayExt<u64> {
 
     fn sum(&self) -> u64 {
         af::sum_all(self.af()).0 as u64
+    }
+}
+
+impl<'de, T: af::HasAfEnum + Deserialize<'de>> Deserialize<'de> for ArrayExt<T>
+where
+    ArrayExt<T>: From<Vec<T>>,
+{
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Vec::<T>::deserialize(deserializer).map(ArrayExt::from)
+    }
+}
+
+impl<T: af::HasAfEnum + Clone + Default + Serialize> Serialize for ArrayExt<T> {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        self.to_vec().serialize(s)
     }
 }
 

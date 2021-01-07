@@ -1,13 +1,15 @@
 use std::fmt;
+use std::iter::FromIterator;
 use std::ops::*;
 
 use arrayfire as af;
 use number_general::*;
 use safecast::{CastFrom, CastInto};
+use serde::de::{self, Deserialize, Deserializer, SeqAccess};
+use serde::ser::{Serialize, SerializeSeq, Serializer};
 
 use super::ext::*;
 use super::{dim4, error, Result, _Complex};
-use std::iter::FromIterator;
 
 #[derive(Clone)]
 pub enum Array {
@@ -893,8 +895,134 @@ where
     Array: From<ArrayExt<T>>,
 {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        let array = ArrayExt::from_iter(iter);
-        Array::from(array)
+        ArrayExt::from_iter(iter).into()
+    }
+}
+
+struct ArrayVisitor;
+
+impl<'de> ArrayVisitor {
+    fn visit_complex<S: SeqAccess<'de>, T: Deserialize<'de>>(
+        &self,
+        mut seq: S,
+    ) -> std::result::Result<ArrayExt<_Complex<T>>, S::Error>
+    where
+        _Complex<T>: af::HasAfEnum,
+    {
+        let (re, im): (Vec<T>, Vec<T>) = seq.next_element()?.ok_or_else(|| {
+            de::Error::custom(format!(
+                "expected a real and imaginary list of {}",
+                std::any::type_name::<T>()
+            ))
+        })?;
+
+        let values = re
+            .into_iter()
+            .zip(im.into_iter())
+            .map(|(re, im)| _Complex::new(re, im));
+
+        Ok(ArrayExt::from_iter(values))
+    }
+
+    fn visit_real<S: SeqAccess<'de>, T: af::HasAfEnum + Deserialize<'de>>(
+        &self,
+        mut seq: S,
+    ) -> std::result::Result<ArrayExt<T>, S::Error> {
+        let values: Vec<T> = seq.next_element()?.ok_or_else(|| {
+            de::Error::custom(format!("expected a list of {}", std::any::type_name::<T>()))
+        })?;
+
+        Ok(ArrayExt::from(&values[..]))
+    }
+}
+
+impl<'de> de::Visitor<'de> for ArrayVisitor {
+    type Value = Array;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "a tuple (NumberType, Vec<Number>), to deserialize an Array"
+        )
+    }
+
+    fn visit_seq<S: SeqAccess<'de>>(
+        self,
+        mut seq: S,
+    ) -> std::result::Result<Self::Value, S::Error> {
+        let dtype = seq
+            .next_element::<NumberType>()?
+            .ok_or_else(|| de::Error::custom("expected a NumberType"))?;
+
+        use ComplexType as CT;
+        use FloatType as FT;
+        use IntType as IT;
+        use NumberType as NT;
+        use UIntType as UT;
+        match dtype {
+            NT::Bool => self.visit_real::<S, bool>(seq).map(Array::from),
+            NT::Complex(ct) => match ct {
+                CT::C32 => self.visit_complex::<S, f32>(seq).map(Array::from),
+                _ => self.visit_complex::<S, f64>(seq).map(Array::from),
+            },
+            NT::Float(ft) => match ft {
+                FT::F32 => self.visit_real::<S, f32>(seq).map(Array::from),
+                _ => self.visit_real::<S, f64>(seq).map(Array::from),
+            },
+            NT::Int(it) => match it {
+                IT::I16 => self.visit_real::<S, i16>(seq).map(Array::from),
+                IT::I32 => self.visit_real::<S, i32>(seq).map(Array::from),
+                _ => self.visit_real::<S, i64>(seq).map(Array::from),
+            },
+            NT::UInt(ut) => match ut {
+                UT::U8 => self.visit_real::<S, u8>(seq).map(Array::from),
+                UT::U16 => self.visit_real::<S, u16>(seq).map(Array::from),
+                UT::U32 => self.visit_real::<S, u32>(seq).map(Array::from),
+                _ => self.visit_real::<S, u64>(seq).map(Array::from),
+            },
+            NT::Number => Err(de::Error::custom(
+                "Array does not support NumberType::Number",
+            )),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Array {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        d.deserialize_seq(ArrayVisitor)
+    }
+}
+
+impl Serialize for Array {
+    fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
+        let mut seq = s.serialize_seq(Some(2))?;
+        seq.serialize_element(&self.dtype())?;
+
+        use Array::*;
+        match self {
+            Bool(b) => seq.serialize_element(b),
+            C32(c) => {
+                let (re, im): (Vec<f32>, Vec<f32>) =
+                    c.to_vec().into_iter().map(|n| (n.re, n.im)).unzip();
+                seq.serialize_element(&(re, im))
+            }
+            C64(c) => {
+                let (re, im): (Vec<f64>, Vec<f64>) =
+                    c.to_vec().into_iter().map(|n| (n.re, n.im)).unzip();
+                seq.serialize_element(&(re, im))
+            }
+            F32(f) => seq.serialize_element(f),
+            F64(f) => seq.serialize_element(f),
+            I16(i) => seq.serialize_element(i),
+            I32(i) => seq.serialize_element(i),
+            I64(i) => seq.serialize_element(i),
+            U8(u) => seq.serialize_element(u),
+            U16(u) => seq.serialize_element(u),
+            U32(u) => seq.serialize_element(u),
+            U64(u) => seq.serialize_element(u),
+        }?;
+
+        seq.end()
     }
 }
 
@@ -972,10 +1100,10 @@ mod tests {
     fn test_div() {
         let a: Array = [1, 2, 3][..].into();
         let b: Array = [2.0][..].into();
-        assert_eq!(&a * &b, [0.5, 1.0, 1.5][..].into());
+        assert_eq!(&a / &b, [0.5, 1.0, 1.5][..].into());
 
         let b: Array = [-1., -4., 4.][..].into();
-        assert_eq!(&a * &b, [-1., -2., 0.75][..].into());
+        assert_eq!(&a / &b, [-1., -0.5, 0.75][..].into());
     }
 
     #[test]
@@ -988,5 +1116,13 @@ mod tests {
     fn test_product() {
         let a: Array = [1, 2, 3, 4][..].into();
         assert_eq!(a.product(), 24.into());
+    }
+
+    #[test]
+    fn test_serialization() {
+        let expected: Array = [1, 2, 3, 4][..].into();
+        let serialized = bincode::serialize(&expected).unwrap();
+        let actual = bincode::deserialize(&serialized).unwrap();
+        assert_eq!(expected, actual);
     }
 }
