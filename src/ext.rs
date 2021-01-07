@@ -10,34 +10,43 @@ use super::{_Complex, dim4};
 
 const BATCH: bool = true;
 
+/// Defines common access methods for instance of [`ArrayExt`].
 pub trait ArrayInstance {
     type DType: af::HasAfEnum;
 
+    /// Borrow this instance as an [`af::Array`].
     fn af(&'_ self) -> &'_ af::Array<Self::DType>;
 
+    /// Borrow this instance as a a mutable [`af::Array`].
     fn af_mut(&'_ mut self) -> &'_ mut af::Array<Self::DType>;
 
+    /// Cast this instance into an [`af::Array`] with type `T`.
     fn af_cast<T: af::HasAfEnum>(&self) -> af::Array<T> {
         self.af().cast()
     }
 
+    /// How many elements are in this `ArrayInstance`.
     fn len(&self) -> usize {
         self.af().elements()
     }
 
+    /// Get the values specified by the given [`af::Indexer`].
     fn get(&self, index: af::Indexer) -> af::Array<Self::DType> {
         af::index_gen(self.af(), index)
     }
 
+    /// Set the values specified by the given [`af::Indexer`] to the corresponding values in `T`.
     fn set<T: ArrayInstance<DType = Self::DType>>(&mut self, index: &af::Indexer, other: &T) {
         af::assign_gen(self.af_mut(), index, other.af());
     }
 
+    /// Set the value at the specified index to `value`.
     fn set_at(&mut self, offset: usize, value: Self::DType) {
         let seq = af::Seq::new(offset as f32, offset as f32, 1.0f32);
         af::assign_seq(self.af_mut(), &[seq], &af::Array::new(&[value], dim4(1)));
     }
 
+    /// Copy the data in this [`af::Array`] into a new `Vec`.
     fn to_vec(&self) -> Vec<Self::DType>
     where
         Self::DType: Clone + Default,
@@ -48,22 +57,27 @@ pub trait ArrayInstance {
     }
 }
 
+/// A wrapper around [`af::Array`] which defines common operations.
 #[derive(Clone)]
 pub struct ArrayExt<T: af::HasAfEnum>(af::Array<T>);
 
 impl<T: af::HasAfEnum + Default> ArrayExt<T> {
+    /// Concatenate two instances of `ArrayExt<T>`.
     pub fn concatenate(left: &ArrayExt<T>, right: &ArrayExt<T>) -> ArrayExt<T> {
         af::join(0, left.af(), right.af()).into()
     }
 
+    /// Cast the values of this `ArrayExt` into a destination type `D`.
     pub fn cast_to<D: af::HasAfEnum>(&self) -> ArrayExt<D> {
         ArrayExt(self.af_cast())
     }
 
+    /// Get the values specified by the given [`af::Indexer`].
     pub fn get(&self, index: af::Indexer) -> Self {
         Self(ArrayInstance::get(self, index))
     }
 
+    /// Get the value at the given index.
     pub fn get_value(&self, index: usize) -> T {
         debug_assert!(index < self.af().elements());
 
@@ -77,10 +91,12 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
         }
     }
 
+    /// Deconstruct this `ArrayExt<T>` into its underlying [`af::Array`].
     pub fn into_inner(self) -> af::Array<T> {
         self.0
     }
 
+    /// Sort this `ArrayExt`.
     pub fn sort(&mut self, ascending: bool)
     where
         T: af::RealNumber,
@@ -88,6 +104,7 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
         *self = Self(af::sort(&self.0, 0, ascending))
     }
 
+    /// Split this `ArrayExt<T>` into two new instances at the given pivot.
     pub fn split(&self, at: usize) -> (ArrayExt<T>, ArrayExt<T>) {
         let left = af::Seq::new(0.0, at as f32, 1.0);
         let right = af::Seq::new(at as f32, self.len() as f32, 1.0);
@@ -292,9 +309,11 @@ impl<T: af::HasAfEnum> FromIterator<T> for ArrayExt<T> {
     }
 }
 
+/// Defines an absolute value method `abs`.
 pub trait ArrayInstanceAbs: ArrayInstance {
     type AbsValue: af::HasAfEnum;
 
+    /// Calculate the element-wise absolute value.
     fn abs(&self) -> ArrayExt<Self::AbsValue>;
 }
 
@@ -354,11 +373,14 @@ impl ArrayInstanceAbs for ArrayExt<i64> {
     }
 }
 
+/// Defines cumulative boolean operations `any` and `all`.
 pub trait ArrayInstanceAnyAll: ArrayInstance {
+    /// Returns `true` if all elements are nonzero.
     fn all(&self) -> bool {
         af::all_true_all(self.af()).0 > 0.0f64
     }
 
+    /// Returns `true` if any element is nonzero.
     fn any(&self) -> bool {
         af::any_true_all(self.af()).0 > 0.0f64
     }
@@ -397,17 +419,24 @@ impl ArrayInstanceAnyAll for ArrayExt<_Complex<f64>> {
     }
 }
 
+/// Defines element-wise comparison operations.
 pub trait ArrayInstanceCompare {
+    /// Element-wise equality.
     fn eq(&self, other: &Self) -> ArrayExt<bool>;
 
+    /// Element-wise greater-than comparison.
     fn gt(&self, other: &Self) -> ArrayExt<bool>;
 
+    /// Element-wise greater-or-equal comparison
     fn gte(&self, other: &Self) -> ArrayExt<bool>;
 
+    /// Element-wise less-than comparison.
     fn lt(&self, other: &Self) -> ArrayExt<bool>;
 
+    /// Element-wise less-or-equal comparison.
     fn lte(&self, other: &Self) -> ArrayExt<bool>;
 
+    /// Element-wise inequality.
     fn ne(&self, other: &Self) -> ArrayExt<bool>;
 }
 
@@ -437,12 +466,15 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T>> ArrayInstanceCompare for ArrayEx
     }
 }
 
+/// Defines common reduction operations `product` and `sum`.
 pub trait ArrayInstanceReduce: ArrayInstance {
     type Product: af::HasAfEnum;
     type Sum: af::HasAfEnum;
 
+    /// Calculate the cumulative product.
     fn product(&self) -> Self::Product;
 
+    /// Calculate the cumulative sum.
     fn sum(&self) -> Self::Sum;
 }
 

@@ -11,6 +11,7 @@ use serde::ser::{Serialize, SerializeSeq, Serializer};
 use super::ext::*;
 use super::{dim4, error, Result, _Complex};
 
+/// A generic one-dimensional array which supports all variants of [`NumberType`].
 #[derive(Clone)]
 pub enum Array {
     Bool(ArrayExt<bool>),
@@ -28,6 +29,7 @@ pub enum Array {
 }
 
 impl Array {
+    /// Cast the values of this array into an `ArrayExt<T>`.
     fn cast_inner<T: af::HasAfEnum>(&self) -> ArrayExt<T> {
         use Array::*;
         match self {
@@ -46,6 +48,7 @@ impl Array {
         }
     }
 
+    /// Concatenate two `Array`s.
     pub fn concatenate(left: &Array, right: &Array) -> Result<Array> {
         use Array::*;
         match (left, right) {
@@ -58,6 +61,7 @@ impl Array {
         }
     }
 
+    /// Construct a new array with the given constant value and length.
     pub fn constant(value: Number, len: usize) -> Array {
         let dim = dim4(len);
 
@@ -89,6 +93,7 @@ impl Array {
         }
     }
 
+    /// The [`NumberType`] of this `Array`.
     pub fn dtype(&self) -> NumberType {
         use Array::*;
         match self {
@@ -107,6 +112,7 @@ impl Array {
         }
     }
 
+    /// Cast into an `Array` of a different `NumberType`.
     pub fn cast_into(&self, dtype: NumberType) -> Array {
         use ComplexType as CT;
         use FloatType as FT;
@@ -143,6 +149,7 @@ impl Array {
         }
     }
 
+    /// Copy the contents of this `Array` into a new `Vec`.
     pub fn to_vec(&self) -> Vec<Number> {
         use Array::*;
         match self {
@@ -161,6 +168,7 @@ impl Array {
         }
     }
 
+    /// Calculate the element-wise absolute value.
     pub fn abs(&self) -> Array {
         use Array::*;
         match self {
@@ -175,6 +183,7 @@ impl Array {
         }
     }
 
+    /// Returns `true` if all elements of this `Array` are nonzero.
     pub fn all(&self) -> bool {
         use Array::*;
         match self {
@@ -193,6 +202,7 @@ impl Array {
         }
     }
 
+    /// Returns `true` if any element of this `Array` is nonzero.
     pub fn any(&self) -> bool {
         use Array::*;
         match self {
@@ -211,12 +221,14 @@ impl Array {
         }
     }
 
+    /// Element-wise logical and.
     pub fn and(&self, other: &Array) -> Array {
         let this: ArrayExt<bool> = self.cast_inner();
         let that: ArrayExt<bool> = other.cast_inner();
         Array::Bool(this.and(&that))
     }
 
+    /// Element-wise equality comparison.
     pub fn eq(&self, other: &Array) -> Array {
         use Array::*;
         match self {
@@ -235,6 +247,7 @@ impl Array {
         }
     }
 
+    /// Element-wise greater-than comparison.
     pub fn gt(&self, other: &Array) -> Array {
         use Array::*;
         match self {
@@ -253,6 +266,7 @@ impl Array {
         }
     }
 
+    /// Element-wise greater-or-equal comparison.
     pub fn gte(&self, other: &Array) -> Array {
         use Array::*;
         match self {
@@ -271,6 +285,7 @@ impl Array {
         }
     }
 
+    /// Element-wise less-than comparison.
     pub fn lt(&self, other: &Array) -> Array {
         use Array::*;
         match self {
@@ -289,6 +304,7 @@ impl Array {
         }
     }
 
+    /// Element-wise less-or-equal comparison.
     pub fn lte(&self, other: &Array) -> Array {
         use Array::*;
         match self {
@@ -307,6 +323,7 @@ impl Array {
         }
     }
 
+    /// Element-wise inequality comparison.
     pub fn ne(&self, other: &Array) -> Array {
         use Array::*;
 
@@ -326,17 +343,20 @@ impl Array {
         }
     }
 
+    /// Element-wise logical not.
     pub fn not(&self) -> Array {
         let this: ArrayExt<bool> = self.cast_inner();
         Array::Bool(this.not())
     }
 
+    /// Element-wise logical or.
     pub fn or(&self, other: &Array) -> Array {
         let this: ArrayExt<bool> = self.cast_inner();
         let that: ArrayExt<bool> = other.cast_inner();
         Array::Bool(this.or(&that))
     }
 
+    /// Calculate the cumulative product of this `Array`.
     pub fn product(&self) -> Number {
         use Array::*;
         match self {
@@ -355,6 +375,7 @@ impl Array {
         }
     }
 
+    /// Calculate the cumulative sum of this `Array`.
     pub fn sum(&self) -> Number {
         use Array::*;
         match self {
@@ -373,6 +394,7 @@ impl Array {
         }
     }
 
+    /// The number of elements in this `Array`.
     pub fn len(&self) -> usize {
         use Array::*;
         match self {
@@ -391,6 +413,7 @@ impl Array {
         }
     }
 
+    /// Get the value at the specified index.
     pub fn get_value(&self, index: usize) -> Number {
         debug_assert!(index < self.len());
 
@@ -411,9 +434,10 @@ impl Array {
         }
     }
 
-    pub fn get(&self, index: af::Array<u64>) -> Self {
+    /// Get the values at the specified coordinates.
+    pub fn get(&self, index: &ArrayExt<u64>) -> Self {
         let mut indexer = af::Indexer::default();
-        indexer.set_index(&index, 0, None);
+        indexer.set_index(index.af(), 0, None);
         self.get_at(indexer)
     }
 
@@ -435,12 +459,14 @@ impl Array {
         }
     }
 
-    pub fn set(&mut self, index: af::Array<u64>, other: &Array) -> Result<()> {
+    /// Set the values at the specified coordinates to the corresponding values in `other`.
+    pub fn set(&mut self, index: &ArrayExt<u64>, other: &Array) -> Result<()> {
         let mut indexer = af::Indexer::default();
-        indexer.set_index(&index, 0, None);
+        indexer.set_index(index.af(), 0, None);
         self.set_at(indexer, other)
     }
 
+    /// Set the value at the specified coordinate to `value`.
     pub fn set_value(&mut self, offset: usize, value: Number) -> Result<()> {
         use Array::*;
         match self {
@@ -517,6 +543,7 @@ impl Array {
         Ok(())
     }
 
+    /// Sort this `Array` in-place.
     pub fn sort(&mut self, ascending: bool) -> Result<()> {
         use Array::*;
         match self {
@@ -541,6 +568,7 @@ impl Array {
         Ok(())
     }
 
+    /// Split this `Array` into two new instances at the given pivot.
     pub fn split(&self, at: usize) -> Result<(Array, Array)> {
         if at < self.len() {
             use Array::*;
@@ -602,6 +630,7 @@ impl Array {
         }
     }
 
+    /// Element-wise logical xor.
     pub fn xor(&self, other: &Array) -> Array {
         let this: ArrayExt<bool> = self.cast_inner();
         let that: ArrayExt<bool> = other.cast_inner();
@@ -1050,8 +1079,7 @@ mod tests {
     #[test]
     fn test_get() {
         let arr = Array::from(vec![1, 2, 3].as_slice());
-        let indices = af::Array::new(&[1, 2], af::Dim4::new(&[2, 1, 1, 1]));
-        let actual = arr.get(indices);
+        let actual = arr.get(&(&[1, 2][..]).into());
         let expected = Array::from(&[2, 3][..]);
         assert_eq!(actual, expected)
     }
@@ -1059,8 +1087,7 @@ mod tests {
     #[test]
     fn test_set() {
         let mut actual = Array::from(&[1, 2, 3][..]);
-        let indices = af::Array::new(&[1, 2], af::Dim4::new(&[2, 1, 1, 1]));
-        actual.set(indices, &Array::from(&[4, 5][..])).unwrap();
+        actual.set(&(&[1, 2][..]).into(), &Array::from(&[4, 5][..])).unwrap();
         let expected = Array::from(&[1, 4, 5][..]);
         assert_eq!(actual, expected)
     }
