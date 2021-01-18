@@ -1,9 +1,9 @@
 [package]
 name = "afarray"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["haydnv"]
 edition = "2018"
-license-file = "LICENSE"
+license = "Apache-2.0"
 description = "Convenience methods for working with ArrayFire arrays in Rust"
 repository = "http://github.com/haydnv/collate"
 readme = "README.md"
