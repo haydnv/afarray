@@ -83,6 +83,7 @@ impl Array {
                 Int::I16(i) => I16(af::constant(i, dim).into()),
                 Int::I32(i) => I32(af::constant(i, dim).into()),
                 Int::I64(i) => I64(af::constant(i, dim).into()),
+                other => panic!("ArrayFire does not support {}", other),
             },
             Number::UInt(u) => match u {
                 UInt::U8(i) => U8(af::constant(i, dim).into()),
@@ -137,6 +138,7 @@ impl Array {
                 IT::I32 => Self::I32(self.cast_inner()),
                 IT::I64 => Self::I64(self.cast_inner()),
                 IT::Int => Self::I64(self.cast_inner()),
+                other => panic!("ArrayFire does not support {}", other),
             },
             NT::UInt(ut) => match ut {
                 UT::U8 => Self::U8(self.cast_inner()),
@@ -570,63 +572,63 @@ impl Array {
 
     /// Split this `Array` into two new instances at the given pivot.
     pub fn split(&self, at: usize) -> Result<(Array, Array)> {
-        if at < self.len() {
-            use Array::*;
-            match self {
-                Bool(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((Bool(l), Bool(r)))
-                }
-                C32(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((C32(l), C32(r)))
-                }
-                C64(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((C64(l), C64(r)))
-                }
-                F32(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((F32(l), F32(r)))
-                }
-                F64(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((F64(l), F64(r)))
-                }
-                I16(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((I16(l), I16(r)))
-                }
-                I32(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((I32(l), I32(r)))
-                }
-                I64(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((I64(l), I64(r)))
-                }
-                U8(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((U8(l), U8(r)))
-                }
-                U16(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((U16(l), U16(r)))
-                }
-                U32(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((U32(l), U32(r)))
-                }
-                U64(u) => {
-                    let (l, r) = u.split(at);
-                    Ok((U64(l), U64(r)))
-                }
-            }
-        } else {
-            Err(error(format!(
+        if at > self.len() {
+            return Err(error(format!(
                 "Invalid pivot for Array of length {}",
                 self.len()
-            )))
+            )));
+        }
+
+        use Array::*;
+        match self {
+            Bool(u) => {
+                let (l, r) = u.split(at);
+                Ok((Bool(l), Bool(r)))
+            }
+            C32(u) => {
+                let (l, r) = u.split(at);
+                Ok((C32(l), C32(r)))
+            }
+            C64(u) => {
+                let (l, r) = u.split(at);
+                Ok((C64(l), C64(r)))
+            }
+            F32(u) => {
+                let (l, r) = u.split(at);
+                Ok((F32(l), F32(r)))
+            }
+            F64(u) => {
+                let (l, r) = u.split(at);
+                Ok((F64(l), F64(r)))
+            }
+            I16(u) => {
+                let (l, r) = u.split(at);
+                Ok((I16(l), I16(r)))
+            }
+            I32(u) => {
+                let (l, r) = u.split(at);
+                Ok((I32(l), I32(r)))
+            }
+            I64(u) => {
+                let (l, r) = u.split(at);
+                Ok((I64(l), I64(r)))
+            }
+            U8(u) => {
+                let (l, r) = u.split(at);
+                Ok((U8(l), U8(r)))
+            }
+            U16(u) => {
+                let (l, r) = u.split(at);
+                Ok((U16(l), U16(r)))
+            }
+            U32(u) => {
+                let (l, r) = u.split(at);
+                Ok((U32(l), U32(r)))
+            }
+            U64(u) => {
+                let (l, r) = u.split(at);
+                Ok((U64(l), U64(r)))
+            }
         }
     }
 
@@ -658,11 +660,13 @@ impl PartialEq for Array {
             (U16(l), U16(r)) => l.eq(r),
             (U32(l), U32(r)) => l.eq(r),
             (U64(l), U64(r)) => l.eq(r),
+            (l, r) if l.dtype() > r.dtype() => {
+                let r = r.cast_into(l.dtype());
+                return l == &r;
+            }
             (l, r) => {
-                let dtype = Ord::max(l.dtype(), r.dtype());
-                let l = l.cast_into(dtype);
-                let r = r.cast_into(dtype);
-                return l == r;
+                let l = l.cast_into(r.dtype());
+                return &l == r;
             }
         };
 
@@ -679,7 +683,8 @@ impl Add for &Array {
             (Bool(l), Bool(r)) => Bool(l + r),
             (C32(l), C32(r)) => C32(l + r),
             (C64(l), C64(r)) => C64(l + r),
-            (F32(l), F32(r)) => F32(l + r),
+            // Adding an F32 array causes a stack overflow
+            (F32(l), F32(r)) => &F64(l.cast_to()) + &F64(r.cast_to()),
             (F64(l), F64(r)) => F64(l + r),
             (I16(l), I16(r)) => I16(l + r),
             (I32(l), I32(r)) => I32(l + r),
@@ -714,7 +719,8 @@ impl Sub for &Array {
             (Bool(l), Bool(r)) => Bool(l - r),
             (C32(l), C32(r)) => C32(l - r),
             (C64(l), C64(r)) => C64(l - r),
-            (F32(l), F32(r)) => F32(l - r),
+            // Subtracting a 32-bit float causes a stack overflow
+            (F32(l), F32(r)) => &F64(l.cast_to()) - &F64(r.cast_to()),
             (F64(l), F64(r)) => F64(l - r),
             (I16(l), I16(r)) => I16(l - r),
             (I32(l), I32(r)) => I32(l - r),
@@ -749,7 +755,8 @@ impl Mul for &Array {
             (Bool(l), Bool(r)) => Bool(l * r),
             (C32(l), C32(r)) => C32(l * r),
             (C64(l), C64(r)) => C64(l * r),
-            (F32(l), F32(r)) => F32(l * r),
+            // Multiplying a 32-bit float causes a stack overflow
+            (F32(l), F32(r)) => &F64(l.cast_to()) * &F64(r.cast_to()),
             (F64(l), F64(r)) => F64(l * r),
             (I16(l), I16(r)) => I16(l * r),
             (I32(l), I32(r)) => I32(l * r),
@@ -784,7 +791,8 @@ impl Div for &Array {
             (Bool(l), Bool(r)) => Bool(l / r),
             (C32(l), C32(r)) => C32(l / r),
             (C64(l), C64(r)) => C64(l / r),
-            (F32(l), F32(r)) => F32(l / r),
+            // dividing an F32 array causes a stack overflow
+            (F32(l), F32(r)) => &F64(l.cast_to()) / &F64(r.cast_to()),
             (F64(l), F64(r)) => F64(l / r),
             (I16(l), I16(r)) => I16(l / r),
             (I32(l), I32(r)) => I32(l / r),
@@ -1087,7 +1095,9 @@ mod tests {
     #[test]
     fn test_set() {
         let mut actual = Array::from(&[1, 2, 3][..]);
-        actual.set(&(&[1, 2][..]).into(), &Array::from(&[4, 5][..])).unwrap();
+        actual
+            .set(&(&[1, 2][..]).into(), &Array::from(&[4, 5][..]))
+            .unwrap();
         let expected = Array::from(&[1, 4, 5][..]);
         assert_eq!(actual, expected)
     }
@@ -1103,6 +1113,16 @@ mod tests {
     }
 
     #[test]
+    fn test_add_float() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [2.0][..].into();
+        assert_eq!(&a + &b, [3.0, 4.0, 5.0][..].into());
+
+        let b: Array = [-1., -4., 4.][..].into();
+        assert_eq!(&a + &b, [0., -2., 7.][..].into());
+    }
+
+    #[test]
     fn test_sub() {
         let a: Array = [1, 2, 3][..].into();
         let b: Array = [1][..].into();
@@ -1114,6 +1134,16 @@ mod tests {
     }
 
     #[test]
+    fn test_sub_float() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [2.0][..].into();
+        assert_eq!(&a - &b, [-1.0, 0., 1.0][..].into());
+
+        let b: Array = [-1., -4., 4.][..].into();
+        assert_eq!(&a - &b, [2., 6., -1.][..].into());
+    }
+
+    #[test]
     fn test_mul() {
         let a: Array = [1, 2, 3][..].into();
         let b: Array = [2][..].into();
@@ -1121,6 +1151,16 @@ mod tests {
 
         let b: Array = [5, 4, 3][..].into();
         assert_eq!(&a * &b, [5, 8, 9][..].into());
+    }
+
+    #[test]
+    fn test_mul_float() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [2.0][..].into();
+        assert_eq!(&a * &b, [2.0, 4.0, 6.0][..].into());
+
+        let b: Array = [-1., -4., 4.][..].into();
+        assert_eq!(&a * &b, [-1., -8., 12.][..].into());
     }
 
     #[test]

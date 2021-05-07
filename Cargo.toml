@@ -1,6 +1,6 @@
 [package]
 name = "afarray"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["haydnv"]
 edition = "2018"
 license = "Apache-2.0"
@@ -18,7 +18,7 @@ pkg-config = "0.3"
 # There is a bug in ArrayFire 3.7 which breaks af::any and af::all. It should be fixed in ArrayFire 3.8.
 arrayfire = "<3.7"
 bincode = "1.3"
-number-general = ">0.1.2"
+number-general = "0.3"
 num-complex = "0.2"
 safecast = "0.1"
 serde = "1.0"

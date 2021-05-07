@@ -24,11 +24,11 @@
 
 use std::fmt;
 
-mod array;
-mod ext;
-
 pub use array::*;
 pub use ext::*;
+
+mod array;
+mod ext;
 
 type _Complex<T> = num_complex::Complex<T>;
 
