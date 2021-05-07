@@ -377,12 +377,12 @@ impl ArrayInstanceAbs for ArrayExt<i64> {
 pub trait ArrayInstanceAnyAll: ArrayInstance {
     /// Returns `true` if all elements are nonzero.
     fn all(&self) -> bool {
-        af::all_true_all(self.af()).0 > 0.0f64
+        af::all_true_all(self.af()).0
     }
 
     /// Returns `true` if any element is nonzero.
     fn any(&self) -> bool {
-        af::any_true_all(self.af()).0 > 0.0f64
+        af::any_true_all(self.af()).0
     }
 }
 
@@ -399,23 +399,23 @@ impl ArrayInstanceAnyAll for ArrayExt<u64> {}
 
 impl ArrayInstanceAnyAll for ArrayExt<_Complex<f32>> {
     fn all(&self) -> bool {
-        af::all_true_all(&af::abs(self.af())).0 > 0f64
+        af::all_true_all(&af::abs(self.af())).0
     }
 
     fn any(&self) -> bool {
         let any = af::any_true_all(self.af());
-        any.0 > 0.0f64 || any.1 > 0.0f64
+        any.0 || any.1
     }
 }
 
 impl ArrayInstanceAnyAll for ArrayExt<_Complex<f64>> {
     fn all(&self) -> bool {
-        af::all_true_all(&af::abs(self.af())).0 > 0f64
+        af::all_true_all(&af::abs(self.af())).0
     }
 
     fn any(&self) -> bool {
         let any = af::any_true_all(self.af());
-        any.0 > 0.0f64 || any.1 > 0.0f64
+        any.0 || any.1
     }
 }
 
@@ -492,8 +492,8 @@ impl ArrayInstanceReduce for ArrayExt<bool> {
 }
 
 impl ArrayInstanceReduce for ArrayExt<_Complex<f32>> {
-    type Product = _Complex<f64>;
-    type Sum = _Complex<f64>;
+    type Product = _Complex<f32>;
+    type Sum = _Complex<f32>;
 
     fn product(&self) -> Self::Product {
         let product = af::product_all(self.af());
@@ -522,14 +522,14 @@ impl ArrayInstanceReduce for ArrayExt<_Complex<f64>> {
 }
 
 impl ArrayInstanceReduce for ArrayExt<f32> {
-    type Product = f64;
-    type Sum = f64;
+    type Product = f32;
+    type Sum = f32;
 
-    fn product(&self) -> f64 {
+    fn product(&self) -> f32 {
         af::product_all(self.af()).0
     }
 
-    fn sum(&self) -> f64 {
+    fn sum(&self) -> f32 {
         af::sum_all(self.af()).0
     }
 }

@@ -21,6 +21,14 @@
 //! assert_eq!(product, Array::from_iter(vec![5, 10, 15]));
 //! assert_eq!(product.sum(), Number::from(30))
 //! ```
+//!
+//! This crate depends on ArrayFire version 3.8 or later. You will have to install ArrayFire
+//! separately by following the instructions at
+//! [https://arrayfire.org/docs/installing.htm](https://arrayfire.org/docs/installing.htm)
+//! in order to build this crate.
+//!
+//! In particular, you will need to make the ArrayFire package discoverable to pkg-config by adding
+//! a pkg-config file for ArrayFire on your system's `$PKG_CONFIG_PATH`.
 
 use std::fmt;
 
