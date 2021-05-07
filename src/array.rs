@@ -5,8 +5,8 @@ use std::ops::*;
 use arrayfire as af;
 use number_general::*;
 use safecast::{CastFrom, CastInto};
-use serde::de::{self, Deserialize, Deserializer, SeqAccess};
-use serde::ser::{Serialize, SerializeSeq, Serializer};
+use serde::de::{Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 
 use super::ext::*;
 use super::{dim4, error, Result, _Complex};
@@ -936,130 +936,58 @@ where
     }
 }
 
-struct ArrayVisitor;
-
-impl<'de> ArrayVisitor {
-    fn visit_complex<S: SeqAccess<'de>, T: Deserialize<'de>>(
-        &self,
-        mut seq: S,
-    ) -> std::result::Result<ArrayExt<_Complex<T>>, S::Error>
-    where
-        _Complex<T>: af::HasAfEnum,
-    {
-        let (re, im): (Vec<T>, Vec<T>) = seq.next_element()?.ok_or_else(|| {
-            de::Error::custom(format!(
-                "expected a real and imaginary list of {}",
-                std::any::type_name::<T>()
-            ))
-        })?;
-
-        let values = re
-            .into_iter()
-            .zip(im.into_iter())
-            .map(|(re, im)| _Complex::new(re, im));
-
-        Ok(ArrayExt::from_iter(values))
-    }
-
-    fn visit_real<S: SeqAccess<'de>, T: af::HasAfEnum + Deserialize<'de>>(
-        &self,
-        mut seq: S,
-    ) -> std::result::Result<ArrayExt<T>, S::Error> {
-        let values: Vec<T> = seq.next_element()?.ok_or_else(|| {
-            de::Error::custom(format!("expected a list of {}", std::any::type_name::<T>()))
-        })?;
-
-        Ok(ArrayExt::from(&values[..]))
-    }
-}
-
-impl<'de> de::Visitor<'de> for ArrayVisitor {
-    type Value = Array;
-
-    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "a tuple (NumberType, Vec<Number>), to deserialize an Array"
-        )
-    }
-
-    fn visit_seq<S: SeqAccess<'de>>(
-        self,
-        mut seq: S,
-    ) -> std::result::Result<Self::Value, S::Error> {
-        let dtype = seq
-            .next_element::<NumberType>()?
-            .ok_or_else(|| de::Error::custom("expected a NumberType"))?;
-
+impl<'de> Deserialize<'de> for Array {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
         use ComplexType as CT;
         use FloatType as FT;
         use IntType as IT;
         use NumberType as NT;
         use UIntType as UT;
-        match dtype {
-            NT::Bool => self.visit_real::<S, bool>(seq).map(Array::from),
+
+        let elements = Vec::<Number>::deserialize(deserializer)?;
+        let dtype = elements.iter().map(|n| n.class()).fold(NT::Bool, Ord::max);
+
+        let array = match dtype {
+            NT::Bool => Self::Bool(array_from(elements)),
             NT::Complex(ct) => match ct {
-                CT::C32 => self.visit_complex::<S, f32>(seq).map(Array::from),
-                _ => self.visit_complex::<S, f64>(seq).map(Array::from),
+                CT::C32 => Self::C32(array_from(elements)),
+                _ => Self::C64(array_from(elements)),
             },
             NT::Float(ft) => match ft {
-                FT::F32 => self.visit_real::<S, f32>(seq).map(Array::from),
-                _ => self.visit_real::<S, f64>(seq).map(Array::from),
+                FT::F32 => Self::F32(array_from(elements)),
+                _ => Self::F64(array_from(elements)),
             },
             NT::Int(it) => match it {
-                IT::I16 => self.visit_real::<S, i16>(seq).map(Array::from),
-                IT::I32 => self.visit_real::<S, i32>(seq).map(Array::from),
-                _ => self.visit_real::<S, i64>(seq).map(Array::from),
+                IT::I8 => Self::I16(array_from(elements)),
+                IT::I16 => Self::I16(array_from(elements)),
+                IT::I32 => Self::I32(array_from(elements)),
+                _ => Self::I64(array_from(elements)),
             },
             NT::UInt(ut) => match ut {
-                UT::U8 => self.visit_real::<S, u8>(seq).map(Array::from),
-                UT::U16 => self.visit_real::<S, u16>(seq).map(Array::from),
-                UT::U32 => self.visit_real::<S, u32>(seq).map(Array::from),
-                _ => self.visit_real::<S, u64>(seq).map(Array::from),
+                UT::U8 => Self::U8(array_from(elements)),
+                UT::U16 => Self::U16(array_from(elements)),
+                UT::U32 => Self::U32(array_from(elements)),
+                _ => Self::U64(array_from(elements)),
             },
-            NT::Number => Err(de::Error::custom(
-                "Array does not support NumberType::Number",
-            )),
-        }
+            NT::Number => Self::F64(array_from(elements)),
+        };
+
+        Ok(array)
     }
 }
 
-impl<'de> Deserialize<'de> for Array {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
-        d.deserialize_seq(ArrayVisitor)
-    }
+fn array_from<T: af::HasAfEnum + CastFrom<Number>>(elements: Vec<Number>) -> ArrayExt<T> {
+    elements
+        .into_iter()
+        .map(|n| n.cast_into())
+        .collect::<Vec<T>>()
+        .as_slice()
+        .into()
 }
 
 impl Serialize for Array {
-    fn serialize<S: Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
-        let mut seq = s.serialize_seq(Some(2))?;
-        seq.serialize_element(&self.dtype())?;
-
-        use Array::*;
-        match self {
-            Bool(b) => seq.serialize_element(b),
-            C32(c) => {
-                let (re, im): (Vec<f32>, Vec<f32>) =
-                    c.to_vec().into_iter().map(|n| (n.re, n.im)).unzip();
-                seq.serialize_element(&(re, im))
-            }
-            C64(c) => {
-                let (re, im): (Vec<f64>, Vec<f64>) =
-                    c.to_vec().into_iter().map(|n| (n.re, n.im)).unzip();
-                seq.serialize_element(&(re, im))
-            }
-            F32(f) => seq.serialize_element(f),
-            F64(f) => seq.serialize_element(f),
-            I16(i) => seq.serialize_element(i),
-            I32(i) => seq.serialize_element(i),
-            I64(i) => seq.serialize_element(i),
-            U8(u) => seq.serialize_element(u),
-            U16(u) => seq.serialize_element(u),
-            U32(u) => seq.serialize_element(u),
-            U64(u) => seq.serialize_element(u),
-        }?;
-
-        seq.end()
+    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        self.to_vec().serialize(serializer)
     }
 }
 
