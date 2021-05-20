@@ -1,6 +1,6 @@
 [package]
 name = "afarray"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["haydnv"]
 edition = "2018"
 license = "Apache-2.0"
@@ -16,9 +16,14 @@ pkg-config = "0.3"
 
 [dependencies]
 arrayfire = "3.8"
-bincode = "1.3"
-destream = { path = "../destream" }
-number-general = { path = "../number-general" }
+async-trait = "0.1"
+destream = "0.4"
+futures = "0.3"
+number-general = "~0.3.7"
 num-complex = "0.2"
 safecast = "0.1"
 serde = "1.0"
+
+[dev-dependencies]
+tbon = "0.2"
+tokio = {version = "1.5", features=["macros", "rt"]}

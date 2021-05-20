@@ -3,6 +3,9 @@ use std::iter::FromIterator;
 use std::ops::*;
 
 use arrayfire as af;
+use async_trait::async_trait;
+use destream::{de, en};
+use futures::TryFutureExt;
 use number_general::*;
 use safecast::{CastFrom, CastInto};
 use serde::de::{Deserialize, Deserializer};
@@ -936,15 +939,14 @@ where
     }
 }
 
-impl<'de> Deserialize<'de> for Array {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+impl From<Vec<Number>> for Array {
+    fn from(elements: Vec<Number>) -> Self {
         use ComplexType as CT;
         use FloatType as FT;
         use IntType as IT;
         use NumberType as NT;
         use UIntType as UT;
 
-        let elements = Vec::<Number>::deserialize(deserializer)?;
         let dtype = elements.iter().map(|n| n.class()).fold(NT::Bool, Ord::max);
 
         let array = match dtype {
@@ -972,7 +974,13 @@ impl<'de> Deserialize<'de> for Array {
             NT::Number => Self::F64(array_from(elements)),
         };
 
-        Ok(array)
+        array
+    }
+}
+
+impl<'de> Deserialize<'de> for Array {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        Vec::<Number>::deserialize(deserializer).map(Self::from)
     }
 }
 
@@ -988,6 +996,29 @@ fn array_from<T: af::HasAfEnum + CastFrom<Number>>(elements: Vec<Number>) -> Arr
 impl Serialize for Array {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
         self.to_vec().serialize(serializer)
+    }
+}
+
+#[async_trait]
+impl de::FromStream for Array {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(
+        cxt: (),
+        decoder: &mut D,
+    ) -> std::result::Result<Self, D::Error> {
+        Vec::<Number>::from_stream(cxt, decoder)
+            .map_ok(Self::from)
+            .await
+    }
+}
+
+impl<'en> en::ToStream<'en> for Array {
+    fn to_stream<E: en::Encoder<'en>>(
+        &'en self,
+        encoder: E,
+    ) -> std::result::Result<E::Ok, E::Error> {
+        en::IntoStream::into_stream(self.to_vec(), encoder)
     }
 }
 
@@ -1113,11 +1144,11 @@ mod tests {
         assert_eq!(a.product(), 24.into());
     }
 
-    #[test]
-    fn test_serialization() {
+    #[tokio::test]
+    async fn test_serialization() {
         let expected: Array = [1, 2, 3, 4][..].into();
-        let serialized = bincode::serialize(&expected).unwrap();
-        let actual = bincode::deserialize(&serialized).unwrap();
+        let serialized = tbon::en::encode(&expected).expect("encode");
+        let actual = tbon::de::try_decode((), serialized).await.expect("decode");
         assert_eq!(expected, actual);
     }
 }
