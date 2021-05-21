@@ -60,6 +60,11 @@ impl fmt::Display for ArrayError {
 /// The result of an `Array` operation which may fail recoverably.
 pub type Result<T> = std::result::Result<T, ArrayError>;
 
+/// Call [`arrayfire::info`].
+pub fn print_af_info() {
+    arrayfire::info()
+}
+
 fn error<I: fmt::Display>(message: I) -> ArrayError {
     ArrayError {
         message: message.to_string(),
