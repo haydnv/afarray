@@ -1,8 +1,12 @@
 use std::fmt;
 use std::iter::FromIterator;
+use std::marker::PhantomData;
 use std::ops::*;
 
 use arrayfire as af;
+use async_trait::async_trait;
+use destream::{de, en};
+use futures::{future, stream, Stream};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
@@ -113,26 +117,68 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
             ArrayExt(af::index(self.af(), &[right, af::Seq::default()])),
         )
     }
+
+    fn into_stream<E>(self) -> impl Stream<Item = Result<Vec<T>, E>>
+    where
+        T: Clone,
+    {
+        stream::once(future::ready(Ok(self.to_vec())))
+    }
+
+    fn to_stream<E>(&self) -> impl Stream<Item = Result<Vec<T>, E>>
+    where
+        T: Clone,
+    {
+        stream::once(future::ready(Ok(self.to_vec())))
+    }
 }
 
 impl ArrayExt<bool> {
+    /// Logical not.
     pub fn not(&self) -> Self {
         ArrayExt(!self.af())
     }
 
+    /// Logical and.
     pub fn and(&self, other: &Self) -> Self {
         ArrayExt(af::and(self.af(), other.af(), BATCH))
     }
 
+    /// Logical or.
     pub fn or(&self, other: &Self) -> Self {
         ArrayExt(af::or(self.af(), other.af(), BATCH))
     }
 
+    /// Logical xor.
     pub fn xor(&self, other: &Self) -> Self {
         let one = af::or(self.af(), other.af(), BATCH);
         let not_both = !(&af::and(self.af(), other.af(), BATCH));
         let one_and_not_both = af::and(&one, &not_both, BATCH);
         ArrayExt(one_and_not_both)
+    }
+}
+
+impl ArrayExt<_Complex<f32>> {
+    /// Get the real component of this array.
+    pub fn re(&self) -> ArrayExt<f32> {
+        af::real(&self.0).into()
+    }
+
+    /// Get the imaginary component of this array.
+    pub fn im(&self) -> ArrayExt<f32> {
+        af::imag(&self.0).into()
+    }
+}
+
+impl ArrayExt<_Complex<f64>> {
+    /// Get the real component of this array.
+    pub fn re(&self) -> ArrayExt<f64> {
+        af::real(&self.0).into()
+    }
+
+    /// Get the imaginary component of this array.
+    pub fn im(&self) -> ArrayExt<f64> {
+        af::imag(&self.0).into()
     }
 }
 
@@ -288,6 +334,20 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> D
     }
 }
 
+impl From<(ArrayExt<f32>, ArrayExt<f32>)> for ArrayExt<_Complex<f32>> {
+    fn from(elements: (ArrayExt<f32>, ArrayExt<f32>)) -> Self {
+        let (re, im) = elements;
+        Self(af::cplx2(re.af(), im.af(), false).cast())
+    }
+}
+
+impl From<(ArrayExt<f64>, ArrayExt<f64>)> for ArrayExt<_Complex<f64>> {
+    fn from(elements: (ArrayExt<f64>, ArrayExt<f64>)) -> Self {
+        let (re, im) = elements;
+        Self(af::cplx2(re.af(), im.af(), false).cast())
+    }
+}
+
 impl<T: af::HasAfEnum> From<af::Array<T>> for ArrayExt<T> {
     fn from(array: af::Array<T>) -> ArrayExt<T> {
         ArrayExt(array)
@@ -298,6 +358,12 @@ impl<T: af::HasAfEnum> From<&[T]> for ArrayExt<T> {
     fn from(values: &[T]) -> ArrayExt<T> {
         let dim = dim4(values.len());
         ArrayExt(af::Array::new(values, dim))
+    }
+}
+
+impl<T: af::HasAfEnum> From<Vec<T>> for ArrayExt<T> {
+    fn from(values: Vec<T>) -> ArrayExt<T> {
+        Self::from(&values[..])
     }
 }
 
@@ -638,7 +704,7 @@ impl ArrayInstanceReduce for ArrayExt<u64> {
     }
 }
 
-impl<'de, T: af::HasAfEnum + Deserialize<'de>> Deserialize<'de> for ArrayExt<T>
+impl<'de, T: af::HasAfEnum + Deserialize<'de> + 'de> Deserialize<'de> for ArrayExt<T>
 where
     ArrayExt<T>: From<Vec<T>>,
 {
@@ -653,6 +719,236 @@ impl<T: af::HasAfEnum + Clone + Default + Serialize> Serialize for ArrayExt<T> {
     }
 }
 
+#[async_trait]
+impl de::FromStream for ArrayExt<bool> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_bool(ArrayExtVisitor::<bool>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<f32> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_f32(ArrayExtVisitor::<f32>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<f64> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_f64(ArrayExtVisitor::<f64>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<u8> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_u8(ArrayExtVisitor::<u8>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<u16> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_u16(ArrayExtVisitor::<u16>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<u32> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_u32(ArrayExtVisitor::<u32>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<u64> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_u64(ArrayExtVisitor::<u64>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<i16> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_i16(ArrayExtVisitor::<i16>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<i32> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_i32(ArrayExtVisitor::<i32>::default())
+            .await
+    }
+}
+
+#[async_trait]
+impl de::FromStream for ArrayExt<i64> {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(_: (), decoder: &mut D) -> Result<Self, D::Error> {
+        decoder
+            .decode_array_i64(ArrayExtVisitor::<i64>::default())
+            .await
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<bool> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_bool(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<bool> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_bool(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<f32> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_f32(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<f32> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_f32(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<f64> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_f64(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<f64> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_f64(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<u8> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_u8(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<u8> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_u8(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<u16> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_u16(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<u16> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_u16(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<u32> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_u32(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<u32> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_u32(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<u64> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_u64(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<u64> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_u64(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<i16> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_i16(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<i16> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_i16(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<i32> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_i32(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<i32> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_i32(self.to_stream())
+    }
+}
+
+impl<'en> en::IntoStream<'en> for ArrayExt<i64> {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_i64(self.into_stream())
+    }
+}
+
+impl<'en> en::ToStream<'en> for ArrayExt<i64> {
+    fn to_stream<E: en::Encoder<'en>>(&'en self, encoder: E) -> Result<E::Ok, E::Error> {
+        encoder.encode_array_i64(self.to_stream())
+    }
+}
+
 impl<T: af::HasAfEnum> fmt::Debug for ArrayExt<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(self, f)
@@ -662,6 +958,192 @@ impl<T: af::HasAfEnum> fmt::Debug for ArrayExt<T> {
 impl<T: af::HasAfEnum> fmt::Display for ArrayExt<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ArrayExt<{}>", std::any::type_name::<T>())
+    }
+}
+
+#[derive(Default)]
+struct ArrayExtVisitor<T> {
+    phantom: PhantomData<T>,
+}
+
+impl<'a, T: af::HasAfEnum + Clone + Copy + Default + Send + 'a> ArrayExtVisitor<T>
+where
+    ArrayExt<T>: From<Vec<T>>,
+{
+    async fn visit_array<A: de::ArrayAccess<T>>(mut access: A) -> Result<ArrayExt<T>, A::Error> {
+        let mut buf = [T::default(); 4096];
+        let mut elements = Vec::new();
+
+        loop {
+            let num = access.buffer(&mut buf).await?;
+            if num == 0 {
+                break;
+            } else {
+                elements.extend_from_slice(&buf[..num]);
+            }
+        }
+
+        Ok(ArrayExt::from(elements))
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<bool> {
+    type Value = ArrayExt<bool>;
+
+    fn expecting() -> &'static str {
+        "a boolean array"
+    }
+
+    async fn visit_array_bool<A: de::ArrayAccess<bool>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<f32> {
+    type Value = ArrayExt<f32>;
+
+    fn expecting() -> &'static str {
+        "a 32-bit float array"
+    }
+
+    async fn visit_array_f32<A: de::ArrayAccess<f32>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<f64> {
+    type Value = ArrayExt<f64>;
+
+    fn expecting() -> &'static str {
+        "a 64-bit float array"
+    }
+
+    async fn visit_array_f64<A: de::ArrayAccess<f64>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<u8> {
+    type Value = ArrayExt<u8>;
+
+    fn expecting() -> &'static str {
+        "an 8-bit unsigned integer array"
+    }
+
+    async fn visit_array_u8<A: de::ArrayAccess<u8>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<u16> {
+    type Value = ArrayExt<u16>;
+
+    fn expecting() -> &'static str {
+        "a 16-bit unsigned integer array"
+    }
+
+    async fn visit_array_u16<A: de::ArrayAccess<u16>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<u32> {
+    type Value = ArrayExt<u32>;
+
+    fn expecting() -> &'static str {
+        "a 32-bit unsigned integer array"
+    }
+
+    async fn visit_array_u32<A: de::ArrayAccess<u32>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<u64> {
+    type Value = ArrayExt<u64>;
+
+    fn expecting() -> &'static str {
+        "a 64-bit unsigned integer array"
+    }
+
+    async fn visit_array_u64<A: de::ArrayAccess<u64>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<i16> {
+    type Value = ArrayExt<i16>;
+
+    fn expecting() -> &'static str {
+        "a 16-bit integer array"
+    }
+
+    async fn visit_array_i16<A: de::ArrayAccess<i16>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<i32> {
+    type Value = ArrayExt<i32>;
+
+    fn expecting() -> &'static str {
+        "a 32-bit integer array"
+    }
+
+    async fn visit_array_i32<A: de::ArrayAccess<i32>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayExtVisitor<i64> {
+    type Value = ArrayExt<i64>;
+
+    fn expecting() -> &'static str {
+        "a 64-bit integer array"
+    }
+
+    async fn visit_array_i64<A: de::ArrayAccess<i64>>(
+        self,
+        access: A,
+    ) -> Result<Self::Value, A::Error> {
+        Self::visit_array(access).await
     }
 }
 

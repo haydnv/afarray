@@ -1001,15 +1001,107 @@ impl Serialize for Array {
 
 #[async_trait]
 impl de::FromStream for Array {
-    type Context = ();
+    type Context = NumberType;
 
     async fn from_stream<D: de::Decoder>(
-        cxt: (),
+        dtype: NumberType,
         decoder: &mut D,
     ) -> std::result::Result<Self, D::Error> {
-        Vec::<Number>::from_stream(cxt, decoder)
-            .map_ok(Self::from)
-            .await
+        use number_general::{
+            ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT,
+        };
+
+        match dtype {
+            NT::Bool => {
+                ArrayExt::<bool>::from_stream((), decoder)
+                    .map_ok(Self::from)
+                    .await
+            }
+            NT::Complex(ct) => match ct {
+                CT::C32 => {
+                    let (re, im) = <(ArrayExt<f32>, ArrayExt<f32>) as de::FromStream>::from_stream(
+                        (),
+                        decoder,
+                    )
+                    .await?;
+
+                    if re.len() == im.len() {
+                        Ok(Self::C32(ArrayExt::from((re, im))))
+                    } else {
+                        Err(de::Error::invalid_length(im.len(), re.len()))
+                    }
+                }
+                _ => {
+                    let (re, im) = <(ArrayExt<f64>, ArrayExt<f64>) as de::FromStream>::from_stream(
+                        (),
+                        decoder,
+                    )
+                    .await?;
+
+                    if re.len() == im.len() {
+                        Ok(Self::C64(ArrayExt::from((re, im))))
+                    } else {
+                        Err(de::Error::invalid_length(im.len(), re.len()))
+                    }
+                }
+            },
+            NT::Float(ft) => match ft {
+                FT::F32 => {
+                    ArrayExt::<f32>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+                _ => {
+                    ArrayExt::<f64>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+            },
+            NT::Int(it) => match it {
+                IT::I16 => {
+                    ArrayExt::<i16>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+                IT::I32 => {
+                    ArrayExt::<i32>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+                _ => {
+                    ArrayExt::<i64>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+            },
+            NT::UInt(ut) => match ut {
+                UT::U8 => {
+                    ArrayExt::<u8>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+                UT::U16 => {
+                    ArrayExt::<u16>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+                UT::U32 => {
+                    ArrayExt::<u32>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+                _ => {
+                    ArrayExt::<u64>::from_stream((), decoder)
+                        .map_ok(Self::from)
+                        .await
+                }
+            },
+            NT::Number => {
+                Vec::<Number>::from_stream((), decoder)
+                    .map_ok(Self::from)
+                    .await
+            }
+        }
     }
 }
 
@@ -1018,7 +1110,41 @@ impl<'en> en::ToStream<'en> for Array {
         &'en self,
         encoder: E,
     ) -> std::result::Result<E::Ok, E::Error> {
-        en::IntoStream::into_stream(self.to_vec(), encoder)
+        use en::IntoStream;
+
+        match self {
+            Self::Bool(array) => array.to_stream(encoder),
+            Self::C32(array) => (array.re(), array.im()).into_stream(encoder),
+            Self::C64(array) => (array.re(), array.im()).into_stream(encoder),
+            Self::F32(array) => array.to_stream(encoder),
+            Self::F64(array) => array.to_stream(encoder),
+            Self::I16(array) => array.to_stream(encoder),
+            Self::I32(array) => array.to_stream(encoder),
+            Self::I64(array) => array.to_stream(encoder),
+            Self::U8(array) => array.to_stream(encoder),
+            Self::U16(array) => array.to_stream(encoder),
+            Self::U32(array) => array.to_stream(encoder),
+            Self::U64(array) => array.to_stream(encoder),
+        }
+    }
+}
+
+impl<'en> en::IntoStream<'en> for Array {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> std::result::Result<E::Ok, E::Error> {
+        match self {
+            Self::Bool(array) => array.into_stream(encoder),
+            Self::C32(array) => (array.re(), array.im()).into_stream(encoder),
+            Self::C64(array) => (array.re(), array.im()).into_stream(encoder),
+            Self::F32(array) => array.into_stream(encoder),
+            Self::F64(array) => array.into_stream(encoder),
+            Self::I16(array) => array.into_stream(encoder),
+            Self::I32(array) => array.into_stream(encoder),
+            Self::I64(array) => array.into_stream(encoder),
+            Self::U8(array) => array.into_stream(encoder),
+            Self::U16(array) => array.into_stream(encoder),
+            Self::U32(array) => array.into_stream(encoder),
+            Self::U64(array) => array.into_stream(encoder),
+        }
     }
 }
 
@@ -1146,9 +1272,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_serialization() {
-        let expected: Array = [1, 2, 3, 4][..].into();
+        let expected: ArrayExt<i32> = [1, 2, 3, 4][..].into();
         let serialized = tbon::en::encode(&expected).expect("encode");
         let actual = tbon::de::try_decode((), serialized).await.expect("decode");
-        assert_eq!(expected, actual);
+        assert!(expected.eq(&actual).all());
     }
 }

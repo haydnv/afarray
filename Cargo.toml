@@ -1,6 +1,6 @@
 [package]
 name = "afarray"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["haydnv"]
 edition = "2018"
 license = "Apache-2.0"
@@ -25,5 +25,5 @@ safecast = "0.1"
 serde = "1.0"
 
 [dev-dependencies]
-tbon = "0.2"
-tokio = {version = "1.5", features=["macros", "rt"]}
+tbon = "~0.2.1"
+tokio = { version = "1.5", features=["macros", "rt"] }
