@@ -6,6 +6,7 @@ use arrayfire as af;
 use async_trait::async_trait;
 use destream::{de, en};
 use futures::TryFutureExt;
+use num_traits::{FromPrimitive, ToPrimitive};
 use number_general::*;
 use safecast::{CastFrom, CastInto};
 use serde::de::{Deserialize, Deserializer};
@@ -1001,107 +1002,13 @@ impl Serialize for Array {
 
 #[async_trait]
 impl de::FromStream for Array {
-    type Context = NumberType;
+    type Context = ();
 
     async fn from_stream<D: de::Decoder>(
-        dtype: NumberType,
+        _: (),
         decoder: &mut D,
     ) -> std::result::Result<Self, D::Error> {
-        use number_general::{
-            ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT,
-        };
-
-        match dtype {
-            NT::Bool => {
-                ArrayExt::<bool>::from_stream((), decoder)
-                    .map_ok(Self::from)
-                    .await
-            }
-            NT::Complex(ct) => match ct {
-                CT::C32 => {
-                    let (re, im) = <(ArrayExt<f32>, ArrayExt<f32>) as de::FromStream>::from_stream(
-                        (),
-                        decoder,
-                    )
-                    .await?;
-
-                    if re.len() == im.len() {
-                        Ok(Self::C32(ArrayExt::from((re, im))))
-                    } else {
-                        Err(de::Error::invalid_length(im.len(), re.len()))
-                    }
-                }
-                _ => {
-                    let (re, im) = <(ArrayExt<f64>, ArrayExt<f64>) as de::FromStream>::from_stream(
-                        (),
-                        decoder,
-                    )
-                    .await?;
-
-                    if re.len() == im.len() {
-                        Ok(Self::C64(ArrayExt::from((re, im))))
-                    } else {
-                        Err(de::Error::invalid_length(im.len(), re.len()))
-                    }
-                }
-            },
-            NT::Float(ft) => match ft {
-                FT::F32 => {
-                    ArrayExt::<f32>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-                _ => {
-                    ArrayExt::<f64>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-            },
-            NT::Int(it) => match it {
-                IT::I16 => {
-                    ArrayExt::<i16>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-                IT::I32 => {
-                    ArrayExt::<i32>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-                _ => {
-                    ArrayExt::<i64>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-            },
-            NT::UInt(ut) => match ut {
-                UT::U8 => {
-                    ArrayExt::<u8>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-                UT::U16 => {
-                    ArrayExt::<u16>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-                UT::U32 => {
-                    ArrayExt::<u32>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-                _ => {
-                    ArrayExt::<u64>::from_stream((), decoder)
-                        .map_ok(Self::from)
-                        .await
-                }
-            },
-            NT::Number => {
-                Vec::<Number>::from_stream((), decoder)
-                    .map_ok(Self::from)
-                    .await
-            }
-        }
+        decoder.decode_seq(ArrayVisitor).await
     }
 }
 
@@ -1113,18 +1020,18 @@ impl<'en> en::ToStream<'en> for Array {
         use en::IntoStream;
 
         match self {
-            Self::Bool(array) => array.to_stream(encoder),
-            Self::C32(array) => (array.re(), array.im()).into_stream(encoder),
-            Self::C64(array) => (array.re(), array.im()).into_stream(encoder),
-            Self::F32(array) => array.to_stream(encoder),
-            Self::F64(array) => array.to_stream(encoder),
-            Self::I16(array) => array.to_stream(encoder),
-            Self::I32(array) => array.to_stream(encoder),
-            Self::I64(array) => array.to_stream(encoder),
-            Self::U8(array) => array.to_stream(encoder),
-            Self::U16(array) => array.to_stream(encoder),
-            Self::U32(array) => array.to_stream(encoder),
-            Self::U64(array) => array.to_stream(encoder),
+            Self::Bool(array) => (DType::Bool, array).into_stream(encoder),
+            Self::C32(array) => (DType::C32, array.re(), array.im()).into_stream(encoder),
+            Self::C64(array) => (DType::C64, array.re(), array.im()).into_stream(encoder),
+            Self::F32(array) => (DType::F32, array).into_stream(encoder),
+            Self::F64(array) => (DType::F64, array).into_stream(encoder),
+            Self::I16(array) => (DType::I16, array).into_stream(encoder),
+            Self::I32(array) => (DType::I32, array).into_stream(encoder),
+            Self::I64(array) => (DType::I64, array).into_stream(encoder),
+            Self::U8(array) => (DType::U8, array).into_stream(encoder),
+            Self::U16(array) => (DType::U16, array).into_stream(encoder),
+            Self::U32(array) => (DType::U32, array).into_stream(encoder),
+            Self::U64(array) => (DType::U64, array).into_stream(encoder),
         }
     }
 }
@@ -1132,18 +1039,18 @@ impl<'en> en::ToStream<'en> for Array {
 impl<'en> en::IntoStream<'en> for Array {
     fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> std::result::Result<E::Ok, E::Error> {
         match self {
-            Self::Bool(array) => array.into_stream(encoder),
-            Self::C32(array) => (array.re(), array.im()).into_stream(encoder),
-            Self::C64(array) => (array.re(), array.im()).into_stream(encoder),
-            Self::F32(array) => array.into_stream(encoder),
-            Self::F64(array) => array.into_stream(encoder),
-            Self::I16(array) => array.into_stream(encoder),
-            Self::I32(array) => array.into_stream(encoder),
-            Self::I64(array) => array.into_stream(encoder),
-            Self::U8(array) => array.into_stream(encoder),
-            Self::U16(array) => array.into_stream(encoder),
-            Self::U32(array) => array.into_stream(encoder),
-            Self::U64(array) => array.into_stream(encoder),
+            Self::Bool(array) => (DType::Bool, array).into_stream(encoder),
+            Self::C32(array) => (DType::C32, array.re(), array.im()).into_stream(encoder),
+            Self::C64(array) => (DType::C64, array.re(), array.im()).into_stream(encoder),
+            Self::F32(array) => (DType::F32, array).into_stream(encoder),
+            Self::F64(array) => (DType::F64, array).into_stream(encoder),
+            Self::I16(array) => (DType::I16, array).into_stream(encoder),
+            Self::I32(array) => (DType::I32, array).into_stream(encoder),
+            Self::I64(array) => (DType::I64, array).into_stream(encoder),
+            Self::U8(array) => (DType::U8, array).into_stream(encoder),
+            Self::U16(array) => (DType::U16, array).into_stream(encoder),
+            Self::U32(array) => (DType::U32, array).into_stream(encoder),
+            Self::U64(array) => (DType::U64, array).into_stream(encoder),
         }
     }
 }
@@ -1157,6 +1064,98 @@ impl fmt::Debug for Array {
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Array<{}>", self.dtype())
+    }
+}
+
+struct ArrayVisitor;
+
+impl ArrayVisitor {
+    async fn visit_array<A: de::SeqAccess, T: af::HasAfEnum>(
+        seq: &mut A,
+    ) -> std::result::Result<ArrayExt<T>, A::Error>
+    where
+        ArrayExt<T>: de::FromStream<Context = ()>,
+    {
+        seq.next_element(())
+            .await?
+            .ok_or_else(|| de::Error::custom("missing array"))
+    }
+}
+
+#[async_trait]
+impl de::Visitor for ArrayVisitor {
+    type Value = Array;
+
+    fn expecting() -> &'static str {
+        "a numeric array"
+    }
+
+    async fn visit_seq<A: de::SeqAccess>(
+        self,
+        mut seq: A,
+    ) -> std::result::Result<Self::Value, A::Error> {
+        let dtype = seq
+            .next_element::<DType>(())
+            .await?
+            .ok_or_else(|| de::Error::custom("missing array data type"))?;
+
+        match dtype {
+            DType::Bool => Self::visit_array(&mut seq).map_ok(Array::Bool).await,
+            DType::C32 => {
+                let re = Self::visit_array(&mut seq).await?;
+                let im = Self::visit_array(&mut seq).await?;
+                Ok(Array::C32(ArrayExt::from((re, im))))
+            }
+            DType::C64 => {
+                let re = Self::visit_array(&mut seq).await?;
+                let im = Self::visit_array(&mut seq).await?;
+                Ok(Array::C64(ArrayExt::from((re, im))))
+            }
+            DType::F32 => Self::visit_array(&mut seq).map_ok(Array::F32).await,
+            DType::F64 => Self::visit_array(&mut seq).map_ok(Array::F64).await,
+            DType::I16 => Self::visit_array(&mut seq).map_ok(Array::I16).await,
+            DType::I32 => Self::visit_array(&mut seq).map_ok(Array::I32).await,
+            DType::I64 => Self::visit_array(&mut seq).map_ok(Array::I64).await,
+            DType::U8 => Self::visit_array(&mut seq).map_ok(Array::U8).await,
+            DType::U16 => Self::visit_array(&mut seq).map_ok(Array::U16).await,
+            DType::U32 => Self::visit_array(&mut seq).map_ok(Array::U32).await,
+            DType::U64 => Self::visit_array(&mut seq).map_ok(Array::U64).await,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Eq, PartialEq, num_derive::FromPrimitive, num_derive::ToPrimitive)]
+enum DType {
+    Bool,
+    C32,
+    C64,
+    F32,
+    F64,
+    I16,
+    I32,
+    I64,
+    U8,
+    U16,
+    U32,
+    U64,
+}
+
+#[async_trait]
+impl de::FromStream for DType {
+    type Context = ();
+
+    async fn from_stream<D: de::Decoder>(
+        cxt: (),
+        decoder: &mut D,
+    ) -> std::result::Result<Self, D::Error> {
+        let dtype = u8::from_stream(cxt, decoder).await?;
+        Self::from_u8(dtype).ok_or_else(|| de::Error::invalid_value(dtype, "an array data type"))
+    }
+}
+
+impl<'en> en::IntoStream<'en> for DType {
+    fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> std::result::Result<E::Ok, E::Error> {
+        self.to_u8().into_stream(encoder)
     }
 }
 
@@ -1272,7 +1271,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_serialization() {
-        let expected: ArrayExt<i32> = [1, 2, 3, 4][..].into();
+        let expected: Array = [1, 2, 3, 4][..].into();
         let serialized = tbon::en::encode(&expected).expect("encode");
         let actual = tbon::de::try_decode((), serialized).await.expect("decode");
         assert!(expected.eq(&actual).all());

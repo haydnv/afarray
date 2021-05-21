@@ -1,6 +1,6 @@
 [package]
 name = "afarray"
-version = "0.3.2"
+version = "0.3.3    "
 authors = ["haydnv"]
 edition = "2018"
 license = "Apache-2.0"
@@ -19,8 +19,10 @@ arrayfire = "3.8"
 async-trait = "0.1"
 destream = "0.4"
 futures = "0.3"
-number-general = "~0.3.7"
 num-complex = "0.2"
+num-derive = "0.3"
+num-traits = "0.2"
+number-general = "~0.3.7"
 safecast = "0.1"
 serde = "1.0"
 
