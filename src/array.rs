@@ -13,14 +13,14 @@ use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
 use super::ext::*;
-use super::{dim4, error, Result, _Complex};
+use super::{error, Complex, Result};
 
 /// A generic one-dimensional array which supports all variants of [`NumberType`].
 #[derive(Clone)]
 pub enum Array {
     Bool(ArrayExt<bool>),
-    C32(ArrayExt<_Complex<f32>>),
-    C64(ArrayExt<_Complex<f64>>),
+    C32(ArrayExt<Complex<f32>>),
+    C64(ArrayExt<Complex<f64>>),
     F32(ArrayExt<f32>),
     F64(ArrayExt<f64>),
     I16(ArrayExt<i16>),
@@ -66,34 +66,34 @@ impl Array {
     }
 
     /// Construct a new array with the given constant value and length.
-    pub fn constant(value: Number, len: usize) -> Array {
-        let dim = dim4(len);
-
+    pub fn constant(value: Number, length: usize) -> Array {
+        use number_general::Complex;
         use Array::*;
+
         match value {
             Number::Bool(b) => {
                 let b: bool = b.into();
-                Bool(af::constant(b, dim).into())
+                Bool(ArrayExt::constant(b, length))
             }
             Number::Complex(c) => match c {
-                Complex::C32(c) => C32(af::constant(c, dim).into()),
-                Complex::C64(c) => C64(af::constant(c, dim).into()),
+                Complex::C32(c) => C32(ArrayExt::constant(c, length)),
+                Complex::C64(c) => C64(ArrayExt::constant(c, length)),
             },
             Number::Float(f) => match f {
-                Float::F32(f) => F32(af::constant(f, dim).into()),
-                Float::F64(f) => F64(af::constant(f, dim).into()),
+                Float::F32(f) => F32(ArrayExt::constant(f, length)),
+                Float::F64(f) => F64(ArrayExt::constant(f, length)),
             },
             Number::Int(i) => match i {
-                Int::I16(i) => I16(af::constant(i, dim).into()),
-                Int::I32(i) => I32(af::constant(i, dim).into()),
-                Int::I64(i) => I64(af::constant(i, dim).into()),
+                Int::I16(i) => I16(ArrayExt::constant(i, length)),
+                Int::I32(i) => I32(ArrayExt::constant(i, length)),
+                Int::I64(i) => I64(ArrayExt::constant(i, length)),
                 other => panic!("ArrayFire does not support {}", other),
             },
             Number::UInt(u) => match u {
-                UInt::U8(i) => U8(af::constant(i, dim).into()),
-                UInt::U16(u) => U16(af::constant(u, dim).into()),
-                UInt::U32(u) => U32(af::constant(u, dim).into()),
-                UInt::U64(u) => U64(af::constant(u, dim).into()),
+                UInt::U8(u) => U8(ArrayExt::constant(u, length)),
+                UInt::U16(u) => U16(ArrayExt::constant(u, length)),
+                UInt::U32(u) => U32(ArrayExt::constant(u, length)),
+                UInt::U64(u) => U64(ArrayExt::constant(u, length)),
             },
         }
     }
@@ -423,6 +423,7 @@ impl Array {
     pub fn get_value(&self, index: usize) -> Number {
         debug_assert!(index < self.len());
 
+        use number_general::Complex;
         use Array::*;
         match self {
             Bool(b) => b.get_value(index).into(),
@@ -481,11 +482,11 @@ impl Array {
                 b.set_at(offset, value.cast_into());
             }
             C32(c) => {
-                let value: Complex = value.cast_into();
+                let value: Complex<f32> = value.cast_into();
                 c.set_at(offset, value.cast_into())
             }
             C64(c) => {
-                let value: Complex = value.cast_into();
+                let value: Complex<f64> = value.cast_into();
                 c.set_at(offset, value.cast_into())
             }
             F32(f) => {
@@ -847,14 +848,14 @@ impl From<ArrayExt<bool>> for Array {
     }
 }
 
-impl From<ArrayExt<_Complex<f32>>> for Array {
-    fn from(c: ArrayExt<_Complex<f32>>) -> Array {
+impl From<ArrayExt<Complex<f32>>> for Array {
+    fn from(c: ArrayExt<Complex<f32>>) -> Array {
         Array::C32(c)
     }
 }
 
-impl From<ArrayExt<_Complex<f64>>> for Array {
-    fn from(c: ArrayExt<_Complex<f64>>) -> Array {
+impl From<ArrayExt<Complex<f64>>> for Array {
+    fn from(c: ArrayExt<Complex<f64>>) -> Array {
         Array::C64(c)
     }
 }

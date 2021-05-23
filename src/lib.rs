@@ -38,7 +38,7 @@ pub use ext::*;
 mod array;
 mod ext;
 
-type _Complex<T> = num_complex::Complex<T>;
+pub type Complex<T> = num_complex::Complex<T>;
 
 /// The error type used for Array which may fail recoverably.
 pub struct ArrayError {

@@ -10,7 +10,7 @@ use futures::{future, stream, Stream};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use super::{_Complex, dim4};
+use super::{dim4, Complex};
 
 const BATCH: bool = true;
 
@@ -66,8 +66,17 @@ pub trait ArrayInstance {
 pub struct ArrayExt<T: af::HasAfEnum>(af::Array<T>);
 
 impl<T: af::HasAfEnum + Default> ArrayExt<T> {
+    /// Construct a new ArrayExt with the given value and length.
+    pub fn constant(value: T, length: usize) -> Self
+    where
+        T: af::ConstGenerator<OutType = T>,
+    {
+        let dim = dim4(length);
+        Self(af::constant(value, dim))
+    }
+
     /// Concatenate two instances of `ArrayExt<T>`.
-    pub fn concatenate(left: &ArrayExt<T>, right: &ArrayExt<T>) -> ArrayExt<T> {
+    pub fn concatenate(left: &Self, right: &Self) -> Self {
         af::join(0, left.af(), right.af()).into()
     }
 
@@ -109,7 +118,7 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     }
 
     /// Split this `ArrayExt<T>` into two new instances at the given pivot.
-    pub fn split(&self, at: usize) -> (ArrayExt<T>, ArrayExt<T>) {
+    pub fn split(&self, at: usize) -> (Self, Self) {
         let left = af::Seq::new(0.0, at as f32, 1.0);
         let right = af::Seq::new(at as f32, self.len() as f32, 1.0);
         (
@@ -158,7 +167,7 @@ impl ArrayExt<bool> {
     }
 }
 
-impl ArrayExt<_Complex<f32>> {
+impl ArrayExt<Complex<f32>> {
     /// Get the real component of this array.
     pub fn re(&self) -> ArrayExt<f32> {
         af::real(&self.0).into()
@@ -170,7 +179,7 @@ impl ArrayExt<_Complex<f32>> {
     }
 }
 
-impl ArrayExt<_Complex<f64>> {
+impl ArrayExt<Complex<f64>> {
     /// Get the real component of this array.
     pub fn re(&self) -> ArrayExt<f64> {
         af::real(&self.0).into()
@@ -334,14 +343,14 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> D
     }
 }
 
-impl From<(ArrayExt<f32>, ArrayExt<f32>)> for ArrayExt<_Complex<f32>> {
+impl From<(ArrayExt<f32>, ArrayExt<f32>)> for ArrayExt<Complex<f32>> {
     fn from(elements: (ArrayExt<f32>, ArrayExt<f32>)) -> Self {
         let (re, im) = elements;
         Self(af::cplx2(re.af(), im.af(), false).cast())
     }
 }
 
-impl From<(ArrayExt<f64>, ArrayExt<f64>)> for ArrayExt<_Complex<f64>> {
+impl From<(ArrayExt<f64>, ArrayExt<f64>)> for ArrayExt<Complex<f64>> {
     fn from(elements: (ArrayExt<f64>, ArrayExt<f64>)) -> Self {
         let (re, im) = elements;
         Self(af::cplx2(re.af(), im.af(), false).cast())
@@ -383,7 +392,7 @@ pub trait ArrayInstanceAbs: ArrayInstance {
     fn abs(&self) -> ArrayExt<Self::AbsValue>;
 }
 
-impl ArrayInstanceAbs for ArrayExt<_Complex<f32>> {
+impl ArrayInstanceAbs for ArrayExt<Complex<f32>> {
     type AbsValue = f32;
 
     fn abs(&self) -> ArrayExt<f32> {
@@ -391,7 +400,7 @@ impl ArrayInstanceAbs for ArrayExt<_Complex<f32>> {
     }
 }
 
-impl ArrayInstanceAbs for ArrayExt<_Complex<f64>> {
+impl ArrayInstanceAbs for ArrayExt<Complex<f64>> {
     type AbsValue = f64;
 
     fn abs(&self) -> ArrayExt<f64> {
@@ -463,7 +472,7 @@ impl ArrayInstanceAnyAll for ArrayExt<u16> {}
 impl ArrayInstanceAnyAll for ArrayExt<u32> {}
 impl ArrayInstanceAnyAll for ArrayExt<u64> {}
 
-impl ArrayInstanceAnyAll for ArrayExt<_Complex<f32>> {
+impl ArrayInstanceAnyAll for ArrayExt<Complex<f32>> {
     fn all(&self) -> bool {
         af::all_true_all(&af::abs(self.af())).0
     }
@@ -474,7 +483,7 @@ impl ArrayInstanceAnyAll for ArrayExt<_Complex<f32>> {
     }
 }
 
-impl ArrayInstanceAnyAll for ArrayExt<_Complex<f64>> {
+impl ArrayInstanceAnyAll for ArrayExt<Complex<f64>> {
     fn all(&self) -> bool {
         af::all_true_all(&af::abs(self.af())).0
     }
@@ -557,33 +566,33 @@ impl ArrayInstanceReduce for ArrayExt<bool> {
     }
 }
 
-impl ArrayInstanceReduce for ArrayExt<_Complex<f32>> {
-    type Product = _Complex<f32>;
-    type Sum = _Complex<f32>;
+impl ArrayInstanceReduce for ArrayExt<Complex<f32>> {
+    type Product = Complex<f32>;
+    type Sum = Complex<f32>;
 
     fn product(&self) -> Self::Product {
         let product = af::product_all(self.af());
-        _Complex::new(product.0, product.1)
+        Complex::new(product.0, product.1)
     }
 
     fn sum(&self) -> Self::Sum {
         let sum = af::sum_all(self.af());
-        _Complex::new(sum.0, sum.1)
+        Complex::new(sum.0, sum.1)
     }
 }
 
-impl ArrayInstanceReduce for ArrayExt<_Complex<f64>> {
-    type Product = _Complex<f64>;
-    type Sum = _Complex<f64>;
+impl ArrayInstanceReduce for ArrayExt<Complex<f64>> {
+    type Product = Complex<f64>;
+    type Sum = Complex<f64>;
 
     fn product(&self) -> Self::Product {
         let product = af::product_all(self.af());
-        _Complex::new(product.0, product.1)
+        Complex::new(product.0, product.1)
     }
 
     fn sum(&self) -> Self::Sum {
         let sum = af::sum_all(self.af());
-        _Complex::new(sum.0, sum.1)
+        Complex::new(sum.0, sum.1)
     }
 }
 
