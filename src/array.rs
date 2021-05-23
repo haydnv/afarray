@@ -34,21 +34,21 @@ pub enum Array {
 
 impl Array {
     /// Cast the values of this array into an `ArrayExt<T>`.
-    fn cast_inner<T: af::HasAfEnum>(&self) -> ArrayExt<T> {
+    pub fn type_cast<T: af::HasAfEnum>(&self) -> ArrayExt<T> {
         use Array::*;
         match self {
-            Bool(b) => b.cast_to(),
-            C32(c) => c.cast_to(),
-            C64(c) => c.cast_to(),
-            F32(f) => f.cast_to(),
-            F64(f) => f.cast_to(),
-            I16(i) => i.cast_to(),
-            I32(i) => i.cast_to(),
-            I64(i) => i.cast_to(),
-            U8(u) => u.cast_to(),
-            U16(u) => u.cast_to(),
-            U32(u) => u.cast_to(),
-            U64(u) => u.cast_to(),
+            Bool(b) => b.type_cast(),
+            C32(c) => c.type_cast(),
+            C64(c) => c.type_cast(),
+            F32(f) => f.type_cast(),
+            F64(f) => f.type_cast(),
+            I16(i) => i.type_cast(),
+            I32(i) => i.type_cast(),
+            I64(i) => i.type_cast(),
+            U8(u) => u.type_cast(),
+            U16(u) => u.type_cast(),
+            U32(u) => u.type_cast(),
+            U64(u) => u.type_cast(),
         }
     }
 
@@ -126,30 +126,30 @@ impl Array {
         use UIntType as UT;
 
         match dtype {
-            NT::Bool => Self::Bool(self.cast_inner()),
+            NT::Bool => Self::Bool(self.type_cast()),
             NT::Complex(ct) => match ct {
-                CT::C32 => Self::C32(self.cast_inner()),
-                CT::C64 => Self::C64(self.cast_inner()),
-                CT::Complex => Self::C64(self.cast_inner()),
+                CT::C32 => Self::C32(self.type_cast()),
+                CT::C64 => Self::C64(self.type_cast()),
+                CT::Complex => Self::C64(self.type_cast()),
             },
             NT::Float(ft) => match ft {
-                FT::F32 => Self::F32(self.cast_inner()),
-                FT::F64 => Self::F64(self.cast_inner()),
-                FT::Float => Self::F64(self.cast_inner()),
+                FT::F32 => Self::F32(self.type_cast()),
+                FT::F64 => Self::F64(self.type_cast()),
+                FT::Float => Self::F64(self.type_cast()),
             },
             NT::Int(it) => match it {
-                IT::I16 => Self::I16(self.cast_inner()),
-                IT::I32 => Self::I32(self.cast_inner()),
-                IT::I64 => Self::I64(self.cast_inner()),
-                IT::Int => Self::I64(self.cast_inner()),
+                IT::I16 => Self::I16(self.type_cast()),
+                IT::I32 => Self::I32(self.type_cast()),
+                IT::I64 => Self::I64(self.type_cast()),
+                IT::Int => Self::I64(self.type_cast()),
                 other => panic!("ArrayFire does not support {}", other),
             },
             NT::UInt(ut) => match ut {
-                UT::U8 => Self::U8(self.cast_inner()),
-                UT::U16 => Self::U16(self.cast_inner()),
-                UT::U32 => Self::U32(self.cast_inner()),
-                UT::U64 => Self::U64(self.cast_inner()),
-                UT::UInt => Self::U64(self.cast_inner()),
+                UT::U8 => Self::U8(self.type_cast()),
+                UT::U16 => Self::U16(self.type_cast()),
+                UT::U32 => Self::U32(self.type_cast()),
+                UT::U64 => Self::U64(self.type_cast()),
+                UT::UInt => Self::U64(self.type_cast()),
             },
             NT::Number => self.clone(),
         }
@@ -229,8 +229,8 @@ impl Array {
 
     /// Element-wise logical and.
     pub fn and(&self, other: &Array) -> Array {
-        let this: ArrayExt<bool> = self.cast_inner();
-        let that: ArrayExt<bool> = other.cast_inner();
+        let this: ArrayExt<bool> = self.type_cast();
+        let that: ArrayExt<bool> = other.type_cast();
         Array::Bool(this.and(&that))
     }
 
@@ -238,18 +238,18 @@ impl Array {
     pub fn eq(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.eq(&other.cast_inner())),
-            C32(l) => Bool(l.eq(&other.cast_inner())),
-            C64(l) => Bool(l.eq(&other.cast_inner())),
-            F32(l) => Bool(l.eq(&other.cast_inner())),
-            F64(l) => Bool(l.eq(&other.cast_inner())),
-            I16(l) => Bool(l.eq(&other.cast_inner())),
-            I32(l) => Bool(l.eq(&other.cast_inner())),
-            I64(l) => Bool(l.eq(&other.cast_inner())),
-            U8(l) => Bool(l.eq(&other.cast_inner())),
-            U16(l) => Bool(l.eq(&other.cast_inner())),
-            U32(l) => Bool(l.eq(&other.cast_inner())),
-            U64(l) => Bool(l.eq(&other.cast_inner())),
+            Bool(l) => Bool(l.eq(&other.type_cast())),
+            C32(l) => Bool(l.eq(&other.type_cast())),
+            C64(l) => Bool(l.eq(&other.type_cast())),
+            F32(l) => Bool(l.eq(&other.type_cast())),
+            F64(l) => Bool(l.eq(&other.type_cast())),
+            I16(l) => Bool(l.eq(&other.type_cast())),
+            I32(l) => Bool(l.eq(&other.type_cast())),
+            I64(l) => Bool(l.eq(&other.type_cast())),
+            U8(l) => Bool(l.eq(&other.type_cast())),
+            U16(l) => Bool(l.eq(&other.type_cast())),
+            U32(l) => Bool(l.eq(&other.type_cast())),
+            U64(l) => Bool(l.eq(&other.type_cast())),
         }
     }
 
@@ -257,18 +257,18 @@ impl Array {
     pub fn gt(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.gt(&other.cast_inner())),
-            C32(l) => Bool(l.gt(&other.cast_inner())),
-            C64(l) => Bool(l.gt(&other.cast_inner())),
-            F32(l) => Bool(l.gt(&other.cast_inner())),
-            F64(l) => Bool(l.gt(&other.cast_inner())),
-            I16(l) => Bool(l.gt(&other.cast_inner())),
-            I32(l) => Bool(l.gt(&other.cast_inner())),
-            I64(l) => Bool(l.gt(&other.cast_inner())),
-            U8(l) => Bool(l.gt(&other.cast_inner())),
-            U16(l) => Bool(l.gt(&other.cast_inner())),
-            U32(l) => Bool(l.gt(&other.cast_inner())),
-            U64(l) => Bool(l.gt(&other.cast_inner())),
+            Bool(l) => Bool(l.gt(&other.type_cast())),
+            C32(l) => Bool(l.gt(&other.type_cast())),
+            C64(l) => Bool(l.gt(&other.type_cast())),
+            F32(l) => Bool(l.gt(&other.type_cast())),
+            F64(l) => Bool(l.gt(&other.type_cast())),
+            I16(l) => Bool(l.gt(&other.type_cast())),
+            I32(l) => Bool(l.gt(&other.type_cast())),
+            I64(l) => Bool(l.gt(&other.type_cast())),
+            U8(l) => Bool(l.gt(&other.type_cast())),
+            U16(l) => Bool(l.gt(&other.type_cast())),
+            U32(l) => Bool(l.gt(&other.type_cast())),
+            U64(l) => Bool(l.gt(&other.type_cast())),
         }
     }
 
@@ -276,18 +276,18 @@ impl Array {
     pub fn gte(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.gte(&other.cast_inner())),
-            C32(l) => Bool(l.gte(&other.cast_inner())),
-            C64(l) => Bool(l.gte(&other.cast_inner())),
-            F32(l) => Bool(l.gte(&other.cast_inner())),
-            F64(l) => Bool(l.gte(&other.cast_inner())),
-            I16(l) => Bool(l.gte(&other.cast_inner())),
-            I32(l) => Bool(l.gte(&other.cast_inner())),
-            I64(l) => Bool(l.gte(&other.cast_inner())),
-            U8(l) => Bool(l.gte(&other.cast_inner())),
-            U16(l) => Bool(l.gte(&other.cast_inner())),
-            U32(l) => Bool(l.gte(&other.cast_inner())),
-            U64(l) => Bool(l.gte(&other.cast_inner())),
+            Bool(l) => Bool(l.gte(&other.type_cast())),
+            C32(l) => Bool(l.gte(&other.type_cast())),
+            C64(l) => Bool(l.gte(&other.type_cast())),
+            F32(l) => Bool(l.gte(&other.type_cast())),
+            F64(l) => Bool(l.gte(&other.type_cast())),
+            I16(l) => Bool(l.gte(&other.type_cast())),
+            I32(l) => Bool(l.gte(&other.type_cast())),
+            I64(l) => Bool(l.gte(&other.type_cast())),
+            U8(l) => Bool(l.gte(&other.type_cast())),
+            U16(l) => Bool(l.gte(&other.type_cast())),
+            U32(l) => Bool(l.gte(&other.type_cast())),
+            U64(l) => Bool(l.gte(&other.type_cast())),
         }
     }
 
@@ -295,18 +295,18 @@ impl Array {
     pub fn lt(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.lt(&other.cast_inner())),
-            C32(l) => Bool(l.lt(&other.cast_inner())),
-            C64(l) => Bool(l.lt(&other.cast_inner())),
-            F32(l) => Bool(l.lt(&other.cast_inner())),
-            F64(l) => Bool(l.lt(&other.cast_inner())),
-            I16(l) => Bool(l.lt(&other.cast_inner())),
-            I32(l) => Bool(l.lt(&other.cast_inner())),
-            I64(l) => Bool(l.lt(&other.cast_inner())),
-            U8(l) => Bool(l.lt(&other.cast_inner())),
-            U16(l) => Bool(l.lt(&other.cast_inner())),
-            U32(l) => Bool(l.lt(&other.cast_inner())),
-            U64(l) => Bool(l.lt(&other.cast_inner())),
+            Bool(l) => Bool(l.lt(&other.type_cast())),
+            C32(l) => Bool(l.lt(&other.type_cast())),
+            C64(l) => Bool(l.lt(&other.type_cast())),
+            F32(l) => Bool(l.lt(&other.type_cast())),
+            F64(l) => Bool(l.lt(&other.type_cast())),
+            I16(l) => Bool(l.lt(&other.type_cast())),
+            I32(l) => Bool(l.lt(&other.type_cast())),
+            I64(l) => Bool(l.lt(&other.type_cast())),
+            U8(l) => Bool(l.lt(&other.type_cast())),
+            U16(l) => Bool(l.lt(&other.type_cast())),
+            U32(l) => Bool(l.lt(&other.type_cast())),
+            U64(l) => Bool(l.lt(&other.type_cast())),
         }
     }
 
@@ -314,18 +314,18 @@ impl Array {
     pub fn lte(&self, other: &Array) -> Array {
         use Array::*;
         match self {
-            Bool(l) => Bool(l.lte(&other.cast_inner())),
-            C32(l) => Bool(l.lte(&other.cast_inner())),
-            C64(l) => Bool(l.lte(&other.cast_inner())),
-            F32(l) => Bool(l.lte(&other.cast_inner())),
-            F64(l) => Bool(l.lte(&other.cast_inner())),
-            I16(l) => Bool(l.lte(&other.cast_inner())),
-            I32(l) => Bool(l.lte(&other.cast_inner())),
-            I64(l) => Bool(l.lte(&other.cast_inner())),
-            U8(l) => Bool(l.lte(&other.cast_inner())),
-            U16(l) => Bool(l.lte(&other.cast_inner())),
-            U32(l) => Bool(l.lte(&other.cast_inner())),
-            U64(l) => Bool(l.lte(&other.cast_inner())),
+            Bool(l) => Bool(l.lte(&other.type_cast())),
+            C32(l) => Bool(l.lte(&other.type_cast())),
+            C64(l) => Bool(l.lte(&other.type_cast())),
+            F32(l) => Bool(l.lte(&other.type_cast())),
+            F64(l) => Bool(l.lte(&other.type_cast())),
+            I16(l) => Bool(l.lte(&other.type_cast())),
+            I32(l) => Bool(l.lte(&other.type_cast())),
+            I64(l) => Bool(l.lte(&other.type_cast())),
+            U8(l) => Bool(l.lte(&other.type_cast())),
+            U16(l) => Bool(l.lte(&other.type_cast())),
+            U32(l) => Bool(l.lte(&other.type_cast())),
+            U64(l) => Bool(l.lte(&other.type_cast())),
         }
     }
 
@@ -334,31 +334,31 @@ impl Array {
         use Array::*;
 
         match self {
-            Bool(l) => Bool(l.ne(&other.cast_inner())),
-            C32(l) => Bool(l.ne(&other.cast_inner())),
-            C64(l) => Bool(l.ne(&other.cast_inner())),
-            F32(l) => Bool(l.ne(&other.cast_inner())),
-            F64(l) => Bool(l.ne(&other.cast_inner())),
-            I16(l) => Bool(l.ne(&other.cast_inner())),
-            I32(l) => Bool(l.ne(&other.cast_inner())),
-            I64(l) => Bool(l.ne(&other.cast_inner())),
-            U8(l) => Bool(l.ne(&other.cast_inner())),
-            U16(l) => Bool(l.ne(&other.cast_inner())),
-            U32(l) => Bool(l.ne(&other.cast_inner())),
-            U64(l) => Bool(l.ne(&other.cast_inner())),
+            Bool(l) => Bool(l.ne(&other.type_cast())),
+            C32(l) => Bool(l.ne(&other.type_cast())),
+            C64(l) => Bool(l.ne(&other.type_cast())),
+            F32(l) => Bool(l.ne(&other.type_cast())),
+            F64(l) => Bool(l.ne(&other.type_cast())),
+            I16(l) => Bool(l.ne(&other.type_cast())),
+            I32(l) => Bool(l.ne(&other.type_cast())),
+            I64(l) => Bool(l.ne(&other.type_cast())),
+            U8(l) => Bool(l.ne(&other.type_cast())),
+            U16(l) => Bool(l.ne(&other.type_cast())),
+            U32(l) => Bool(l.ne(&other.type_cast())),
+            U64(l) => Bool(l.ne(&other.type_cast())),
         }
     }
 
     /// Element-wise logical not.
     pub fn not(&self) -> Array {
-        let this: ArrayExt<bool> = self.cast_inner();
+        let this: ArrayExt<bool> = self.type_cast();
         Array::Bool(this.not())
     }
 
     /// Element-wise logical or.
     pub fn or(&self, other: &Array) -> Array {
-        let this: ArrayExt<bool> = self.cast_inner();
-        let that: ArrayExt<bool> = other.cast_inner();
+        let this: ArrayExt<bool> = self.type_cast();
+        let that: ArrayExt<bool> = other.type_cast();
         Array::Bool(this.or(&that))
     }
 
@@ -532,18 +532,18 @@ impl Array {
     fn set_at(&mut self, index: af::Indexer, value: &Array) -> Result<()> {
         use Array::*;
         match self {
-            Bool(l) => l.set(&index, &value.cast_inner()),
-            C32(l) => l.set(&index, &value.cast_inner()),
-            C64(l) => l.set(&index, &value.cast_inner()),
-            F32(l) => l.set(&index, &value.cast_inner()),
-            F64(l) => l.set(&index, &value.cast_inner()),
-            I16(l) => l.set(&index, &value.cast_inner()),
-            I32(l) => l.set(&index, &value.cast_inner()),
-            I64(l) => l.set(&index, &value.cast_inner()),
-            U8(l) => l.set(&index, &value.cast_inner()),
-            U16(l) => l.set(&index, &value.cast_inner()),
-            U32(l) => l.set(&index, &value.cast_inner()),
-            U64(l) => l.set(&index, &value.cast_inner()),
+            Bool(l) => l.set(&index, &value.type_cast()),
+            C32(l) => l.set(&index, &value.type_cast()),
+            C64(l) => l.set(&index, &value.type_cast()),
+            F32(l) => l.set(&index, &value.type_cast()),
+            F64(l) => l.set(&index, &value.type_cast()),
+            I16(l) => l.set(&index, &value.type_cast()),
+            I32(l) => l.set(&index, &value.type_cast()),
+            I64(l) => l.set(&index, &value.type_cast()),
+            U8(l) => l.set(&index, &value.type_cast()),
+            U16(l) => l.set(&index, &value.type_cast()),
+            U32(l) => l.set(&index, &value.type_cast()),
+            U64(l) => l.set(&index, &value.type_cast()),
         }
 
         Ok(())
@@ -638,8 +638,8 @@ impl Array {
 
     /// Element-wise logical xor.
     pub fn xor(&self, other: &Array) -> Array {
-        let this: ArrayExt<bool> = self.cast_inner();
-        let that: ArrayExt<bool> = other.cast_inner();
+        let this: ArrayExt<bool> = self.type_cast();
+        let that: ArrayExt<bool> = other.type_cast();
         Array::Bool(this.xor(&that))
     }
 }
@@ -688,7 +688,7 @@ impl Add for &Array {
             (C32(l), C32(r)) => C32(l + r),
             (C64(l), C64(r)) => C64(l + r),
             // Adding an F32 array causes a stack overflow
-            (F32(l), F32(r)) => &F64(l.cast_to()) + &F64(r.cast_to()),
+            (F32(l), F32(r)) => &F64(l.type_cast()) + &F64(r.type_cast()),
             (F64(l), F64(r)) => F64(l + r),
             (I16(l), I16(r)) => I16(l + r),
             (I32(l), I32(r)) => I32(l + r),
@@ -724,7 +724,7 @@ impl Sub for &Array {
             (C32(l), C32(r)) => C32(l - r),
             (C64(l), C64(r)) => C64(l - r),
             // Subtracting a 32-bit float causes a stack overflow
-            (F32(l), F32(r)) => &F64(l.cast_to()) - &F64(r.cast_to()),
+            (F32(l), F32(r)) => &F64(l.type_cast()) - &F64(r.type_cast()),
             (F64(l), F64(r)) => F64(l - r),
             (I16(l), I16(r)) => I16(l - r),
             (I32(l), I32(r)) => I32(l - r),
@@ -760,7 +760,7 @@ impl Mul for &Array {
             (C32(l), C32(r)) => C32(l * r),
             (C64(l), C64(r)) => C64(l * r),
             // Multiplying a 32-bit float causes a stack overflow
-            (F32(l), F32(r)) => &F64(l.cast_to()) * &F64(r.cast_to()),
+            (F32(l), F32(r)) => &F64(l.type_cast()) * &F64(r.type_cast()),
             (F64(l), F64(r)) => F64(l * r),
             (I16(l), I16(r)) => I16(l * r),
             (I32(l), I32(r)) => I32(l * r),
@@ -796,7 +796,7 @@ impl Div for &Array {
             (C32(l), C32(r)) => C32(l / r),
             (C64(l), C64(r)) => C64(l / r),
             // dividing an F32 array causes a stack overflow
-            (F32(l), F32(r)) => &F64(l.cast_to()) / &F64(r.cast_to()),
+            (F32(l), F32(r)) => &F64(l.type_cast()) / &F64(r.type_cast()),
             (F64(l), F64(r)) => F64(l / r),
             (I16(l), I16(r)) => I16(l / r),
             (I32(l), I32(r)) => I32(l / r),
@@ -825,18 +825,18 @@ impl<T: af::HasAfEnum> CastFrom<Array> for ArrayExt<T> {
     fn cast_from(array: Array) -> ArrayExt<T> {
         use Array::*;
         match array {
-            Bool(b) => b.cast_to(),
-            C32(c) => c.cast_to(),
-            C64(c) => c.cast_to(),
-            F32(f) => f.cast_to(),
-            F64(f) => f.cast_to(),
-            I16(i) => i.cast_to(),
-            I32(i) => i.cast_to(),
-            I64(i) => i.cast_to(),
-            U8(u) => u.cast_to(),
-            U16(u) => u.cast_to(),
-            U32(u) => u.cast_to(),
-            U64(u) => u.cast_to(),
+            Bool(b) => b.type_cast(),
+            C32(c) => c.type_cast(),
+            C64(c) => c.type_cast(),
+            F32(f) => f.type_cast(),
+            F64(f) => f.type_cast(),
+            I16(i) => i.type_cast(),
+            I32(i) => i.type_cast(),
+            I64(i) => i.type_cast(),
+            U8(u) => u.type_cast(),
+            U16(u) => u.type_cast(),
+            U32(u) => u.type_cast(),
+            U64(u) => u.type_cast(),
         }
     }
 }

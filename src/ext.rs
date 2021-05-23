@@ -72,7 +72,7 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     }
 
     /// Cast the values of this `ArrayExt` into a destination type `D`.
-    pub fn cast_to<D: af::HasAfEnum>(&self) -> ArrayExt<D> {
+    pub fn type_cast<D: af::HasAfEnum>(&self) -> ArrayExt<D> {
         ArrayExt(self.af_cast())
     }
 
@@ -255,7 +255,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> A
 
     fn add_assign(&mut self, other: Self) {
         let sum = &*self + &other;
-        *self = sum.cast_to();
+        *self = sum.type_cast();
     }
 }
 
@@ -280,7 +280,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> S
 
     fn sub_assign(&mut self, other: Self) {
         let diff = &*self - &other;
-        *self = diff.cast_to();
+        *self = diff.type_cast();
     }
 }
 
@@ -305,7 +305,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> M
 
     fn mul_assign(&mut self, other: Self) {
         let product = &*self * &other;
-        *self = product.cast_to();
+        *self = product.type_cast();
     }
 }
 
@@ -330,7 +330,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> D
 
     fn div_assign(&mut self, other: Self) {
         let div = &*self / &other;
-        *self = div.cast_to();
+        *self = div.type_cast();
     }
 }
 
