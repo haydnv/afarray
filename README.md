@@ -19,16 +19,4 @@ assert_eq!(product.sum(), Number::from(30))
 Note that you must have [ArrayFire](http://arrayfire.org) installed in order to build this crate. The installation
 instructions are at [http://arrayfire.org/docs/installing.htm](http://arrayfire.org/docs/installing.htm).
 
-In particular, you will need to make the ArrayFire package discoverable to pkg-config by adding
-a pkg-config on your system's $PKG_CONFIG_PATH, like this `arrayfire.pc` config file:
-```
-prefix=/usr
-exec_prefix=${prefix}
-includedir=${prefix}/include
-libdir=${exec_prefix}/lib64
-
-Name: arrayfire
-Description: the ArrayFire library
-Version: 3.8
-Libs: -L${libdir}
-```
+You can find detailed instructions for building the Rust `arrayfire` crate from crates.io at: [https://crates.io/crates/arrayfire](https://crates.io/crates/arrayfire).

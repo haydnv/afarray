@@ -27,8 +27,8 @@
 //! [https://arrayfire.org/docs/installing.htm](https://arrayfire.org/docs/installing.htm)
 //! in order to build this crate.
 //!
-//! In particular, you will need to make the ArrayFire package discoverable to pkg-config by adding
-//! a pkg-config file for ArrayFire on your system's `$PKG_CONFIG_PATH`.
+//! You can find detailed instructions for building the Rust `arrayfire` crate from crates.io
+//! at [https://crates.io/crates/arrayfire](https://crates.io/crates/arrayfire).
 
 use std::fmt;
 

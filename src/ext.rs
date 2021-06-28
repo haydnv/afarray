@@ -192,6 +192,12 @@ impl ArrayExt<Complex<f64>> {
 }
 
 impl ArrayExt<u64> {
+    pub fn range(len: usize) -> Self {
+        let dims = dim4(len);
+        let tile = dim4(1);
+        af::iota(dims, tile).into()
+    }
+
     pub fn from_coords<C: IntoIterator<Item = Vec<u64>>>(shape: &[u64], coords: C) -> Self {
         let ndim = shape.len();
         let coord_bounds = coord_bounds(shape);
@@ -206,6 +212,7 @@ impl ArrayExt<u64> {
             &coords,
             af::Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]),
         );
+
         let offsets = af::mul(&coords, &af_coord_bounds, true);
         let offsets = af::sum(&offsets, 0);
 
@@ -1160,4 +1167,15 @@ fn coord_bounds(shape: &[u64]) -> Vec<u64> {
     (0..shape.len())
         .map(|axis| shape[axis + 1..].iter().product())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_range() {
+        let range = ArrayExt::range(10);
+        assert_eq!(range.to_vec(), (0..10).collect::<Vec<u64>>())
+    }
 }
