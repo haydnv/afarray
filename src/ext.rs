@@ -207,11 +207,8 @@ impl ArrayExt<u64> {
     /// Construct a new `ArrayExt<u64>` of offsets from a list of `Vec<u64>` coordinates.
     ///
     /// Panics: if any coordinate has length not equal to `shape.len()`.
-    pub fn from_coords<C: IntoIterator<Item = Vec<u64>>>(shape: &[u64], coords: C) -> Self {
+    pub fn from_coords<C: IntoIterator<Item = Vec<u64>>>(coords: C, shape: &[u64]) -> Self {
         let ndim = shape.len();
-        let coord_bounds = coord_bounds(shape);
-        let af_coord_bounds: af::Array<u64> =
-            af::Array::new(&coord_bounds, af::Dim4::new(&[ndim as u64, 1, 1, 1]));
 
         let coords: Vec<u64> = coords
             .into_iter()
@@ -226,10 +223,7 @@ impl ArrayExt<u64> {
             af::Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]),
         );
 
-        let offsets = af::mul(&coords, &af_coord_bounds, true);
-        let offsets = af::sum(&offsets, 0);
-
-        Self(offsets)
+        to_offsets(&coords, shape)
     }
 
     /// Construct a new [`af::Array`] of coordinates from this `ArrayExt<u64>` of offsets.
@@ -237,8 +231,10 @@ impl ArrayExt<u64> {
         let ndim = shape.len() as u64;
         let coord_bounds = coord_bounds(shape);
 
-        let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, af::Dim4::new(&[1, ndim, 1, 1]));
-        let af_shape: af::Array<u64> = af::Array::new(&shape.to_vec(), af::Dim4::new(&[1, ndim, 1, 1]));
+        let af_coord_bounds: af::Array<u64> =
+            af::Array::new(&coord_bounds, af::Dim4::new(&[1, ndim, 1, 1]));
+        let af_shape: af::Array<u64> =
+            af::Array::new(&shape.to_vec(), af::Dim4::new(&[1, ndim, 1, 1]));
 
         let offsets = af::div(self.af(), &af_coord_bounds, true);
         let coords = af::modulo(&offsets, &af_shape, true);
@@ -346,15 +342,16 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> D
     }
 }
 
-impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> DivAssign for ArrayExt<T>
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Rem for &ArrayExt<T>
     where
         <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
         <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
         <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
 
-    fn div_assign(&mut self, other: Self) {
-        let div = &*self / &other;
-        *self = div.type_cast();
+    type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
+
+    fn rem(self, other: Self) -> Self::Output {
+        ArrayExt(af::modulo(&self.0, &other.0, BATCH))
     }
 }
 
@@ -975,7 +972,13 @@ impl<'en> en::ToStream<'en> for ArrayExt<i64> {
 
 impl<T: af::HasAfEnum + fmt::Display + Default + Clone> fmt::Debug for ArrayExt<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ArrayExt<{}>({}): {}", std::any::type_name::<T>(), self.af().dims(), self)
+        write!(
+            f,
+            "ArrayExt<{}>({}): {}",
+            std::any::type_name::<T>(),
+            self.af().dims(),
+            self
+        )
     }
 }
 
@@ -1003,6 +1006,16 @@ pub fn to_coords(coords: &af::Array<u64>, ndim: usize) -> Vec<Vec<u64>> {
 /// Convert the given [`af::Array<u64>`] into a list of `Vec<u64>` coordinates.
 pub fn into_coords(coords: af::Array<u64>, ndim: usize) -> Vec<Vec<u64>> {
     to_coords(&coords, ndim)
+}
+
+/// Convert the given [`af::Array<u64>`] into an [`ArrayExt<u64>`] of offsets using the given shape.
+pub fn to_offsets(coords: &af::Array<u64>, shape: &[u64]) -> ArrayExt<u64> {
+    let ndim = shape.len();
+    let coord_bounds = coord_bounds(shape);
+    let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, dim4(ndim));
+
+    let offsets = af::mul(coords, &af_coord_bounds, true);
+    af::sum(&offsets, 0).into()
 }
 
 #[derive(Default)]
@@ -1211,12 +1224,9 @@ mod tests {
     fn test_to_coords() {
         let offsets = ArrayExt::range(0, 5);
         let coords = offsets.to_coords(&[5, 2]);
-        assert_eq!(into_coords(coords, 2), vec![
-            vec![0, 0],
-            vec![0, 1],
-            vec![1, 0],
-            vec![1, 1],
-            vec![2, 0],
-        ])
+        assert_eq!(
+            into_coords(coords, 2),
+            vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1], vec![2, 0],]
+        )
     }
 }
