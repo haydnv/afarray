@@ -14,6 +14,7 @@ pub type Coord = Vec<u64>;
 pub type Offsets = ArrayExt<u64>;
 
 /// A hardware-accelerated set of n-dimensional coordinates, all with the same dimension.
+#[derive(Clone)]
 pub struct Coords {
     array: af::Array<u64>,
     ndim: usize,
@@ -119,18 +120,18 @@ impl Coords {
     /// Return a list of [`Coord`]s from these `Coords`.
     ///
     /// Panics: if the given number of dimensions does not fit the set of coordinates.
-    pub fn to_vec(&self, ndim: usize) -> Vec<Vec<u64>> {
-        assert_eq!(self.array.elements() % ndim, 0);
+    pub fn to_vec(&self) -> Vec<Vec<u64>> {
+        assert_eq!(self.array.elements() % self.ndim, 0);
         let mut to_vec = vec![0u64; self.array.elements()];
         self.array.host(&mut to_vec);
-        to_vec.chunks(ndim).map(|coord| coord.to_vec()).collect()
+        to_vec.chunks(self.ndim).map(|coord| coord.to_vec()).collect()
     }
 
     /// Convert these `Coords` into a list of [`Coord`]s.
     ///
     /// Panics: if the given number of dimensions does not fit the set of coordinates.
-    pub fn into_vec(self, ndim: usize) -> Vec<Vec<u64>> {
-        self.to_vec(ndim)
+    pub fn into_vec(self) -> Vec<Vec<u64>> {
+        self.to_vec()
     }
 }
 
@@ -197,7 +198,7 @@ mod tests {
         let offsets = ArrayExt::range(0, 5);
         let coords = Coords::from_offsets(offsets, &[5, 2]);
         assert_eq!(
-            coords.into_vec(2),
+            coords.into_vec(),
             vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1], vec![2, 0],]
         )
     }
