@@ -11,6 +11,7 @@ use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
 use super::{dim4, Complex};
+use arrayfire::Dim4;
 
 const BATCH: bool = true;
 
@@ -233,22 +234,22 @@ impl ArrayExt<u64> {
     }
 
     /// Construct a new [`af::Array`] of coordinates from this `ArrayExt<u64>` of offsets.
-    ///
-    /// Panics: if the given shape does not fit this array of offsets.
     pub fn to_coords(&self, shape: &[u64]) -> af::Array<u64> {
         let ndim = shape.len();
-        assert_eq!(self.len() % ndim, 0);
-
+        let num_coords = self.len();
         let coord_bounds = coord_bounds(shape);
+
         let af_coord_bounds: af::Array<u64> =
             af::Array::new(&coord_bounds, af::Dim4::new(&[ndim as u64, 1, 1, 1]));
+
         let af_shape: af::Array<u64> =
             af::Array::new(&shape.to_vec(), af::Dim4::new(&[1, ndim as u64, 1, 1]));
 
         let offsets = af::div(self.af(), &af_coord_bounds, true);
         let offsets = af::modulo(&offsets, &af_shape, true);
 
-        af::transpose(&offsets, false)
+        let coords = af::transpose(&offsets, false);
+        af::moddims(&coords, Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]))
     }
 }
 
@@ -979,15 +980,22 @@ impl<'en> en::ToStream<'en> for ArrayExt<i64> {
     }
 }
 
-impl<T: af::HasAfEnum> fmt::Debug for ArrayExt<T> {
+impl<T: af::HasAfEnum + fmt::Display + Default + Clone> fmt::Debug for ArrayExt<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(self, f)
+        write!(f, "ArrayExt<{}>({}): {}", std::any::type_name::<T>(), self.af().dims(), self)
     }
 }
 
-impl<T: af::HasAfEnum> fmt::Display for ArrayExt<T> {
+impl<T: af::HasAfEnum + fmt::Display + Default + Clone> fmt::Display for ArrayExt<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ArrayExt<{}>", std::any::type_name::<T>())
+        let as_str: String = self
+            .to_vec()
+            .into_iter()
+            .map(|n| n.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+
+        write!(f, "[{}]", as_str)
     }
 }
 
