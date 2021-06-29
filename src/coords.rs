@@ -139,11 +139,25 @@ impl Coords {
         self.ndim
     }
 
+    /// Return a copy of these `Coords` without the specified axis.
+    pub fn contract(&self, axis: usize) -> Self {
+        let mut index: Vec<u64> = (0..self.ndim as u64).collect();
+        index.remove(axis);
+        let index = af::Array::new(&index, dim4(index.len()));
+
+        let seq4gen = af::Seq::new(0., (self.len() - 1) as f64, 1.);
+
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&index, 0, None);
+        indexer.set_index(&seq4gen, 1, Some(true));
+        self.get(indexer)
+    }
+
     /// Construct a new `Coords` from the selected indices.
     ///
     /// Panics: if any index is out of bounds
-    pub fn get(&self, index: af::Indexer) -> Self {
-        let array = af::index_gen(self.af(), index);
+    pub fn get(&self, indexer: af::Indexer) -> Self {
+        let array = af::index_gen(self.af(), indexer);
         let ndim = array.dims()[0] as usize;
         let num_coords = array.elements() / ndim;
         let dims = af::Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]);
@@ -154,8 +168,8 @@ impl Coords {
     /// Update these `Coords` by writing the given `value` at the given `index`.
     ///
     /// Panics: if any index is out of bounds
-    pub fn set(&mut self, index: &af::Indexer, value: Self) {
-        af::assign_gen(self.af_mut(), index, value.af());
+    pub fn set(&mut self, indexer: &af::Indexer, value: Self) {
+        af::assign_gen(self.af_mut(), indexer, value.af());
     }
 
     /// Return these `Coords` as [`Offsets`] with respect to the given shape.
