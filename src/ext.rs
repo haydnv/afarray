@@ -192,21 +192,34 @@ impl ArrayExt<Complex<f64>> {
 }
 
 impl ArrayExt<u64> {
-    pub fn range(len: usize) -> Self {
-        let dims = dim4(len);
+    /// Construct a new `ArrayExt<u64>` with elements `start..end`.
+    pub fn range(start: u64, end: u64) -> Self {
+        let dims = dim4((end - start) as usize);
         let tile = dim4(1);
-        af::iota(dims, tile).into()
+        let range: af::Array<u64> = af::iota(dims, tile).into();
+        if start == 0 {
+            range.into()
+        } else {
+            af::add(&range, &af::Array::new(&[start], dim4(1)), true).into()
+        }
     }
 
+    /// Construct a new `ArrayExt<u64>` of offsets from a list of `Vec<u64>` coordinates.
+    ///
+    /// Panics: if any coordinate has length not equal to `shape.len()`.
     pub fn from_coords<C: IntoIterator<Item = Vec<u64>>>(shape: &[u64], coords: C) -> Self {
         let ndim = shape.len();
         let coord_bounds = coord_bounds(shape);
         let af_coord_bounds: af::Array<u64> =
             af::Array::new(&coord_bounds, af::Dim4::new(&[ndim as u64, 1, 1, 1]));
 
-        let coords: Vec<u64> = coords.into_iter().flatten().collect();
+        let coords: Vec<u64> = coords
+            .into_iter()
+            .inspect(|coord| assert!(coord.len() == ndim))
+            .flatten()
+            .collect();
+
         let num_coords = coords.len() / ndim;
-        assert_eq!(coords.len(), num_coords * ndim);
 
         let coords = af::Array::new(
             &coords,
@@ -219,7 +232,10 @@ impl ArrayExt<u64> {
         Self(offsets)
     }
 
-    pub fn to_coords(&self, shape: &[u64]) -> Vec<Vec<u64>> {
+    /// Construct a new [`af::Array`] of coordinates from this `ArrayExt<u64>` of offsets.
+    ///
+    /// Panics: if the given shape does not fit this array of offsets.
+    pub fn to_coords(&self, shape: &[u64]) -> af::Array<u64> {
         let ndim = shape.len();
         assert_eq!(self.len() % ndim, 0);
 
@@ -232,9 +248,7 @@ impl ArrayExt<u64> {
         let offsets = af::div(self.af(), &af_coord_bounds, true);
         let offsets = af::modulo(&offsets, &af_shape, true);
 
-        let mut coords = vec![0u64; offsets.elements()];
-        af::transpose(&offsets, false).host(&mut coords);
-        coords.chunks(ndim).map(|coord| coord.to_vec()).collect()
+        af::transpose(&offsets, false)
     }
 }
 
@@ -1175,7 +1189,7 @@ mod tests {
 
     #[test]
     fn test_range() {
-        let range = ArrayExt::range(10);
-        assert_eq!(range.to_vec(), (0..10).collect::<Vec<u64>>())
+        let range = ArrayExt::range(1, 10);
+        assert_eq!(range.to_vec(), (1..10).collect::<Vec<u64>>())
     }
 }
