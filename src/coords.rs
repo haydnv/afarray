@@ -109,6 +109,11 @@ impl Coords {
         Ok(Self { array, ndim })
     }
 
+    /// Borrow these `Coords` as an `af::Array<u64>`.
+    pub fn af(&self) -> &af::Array<u64> {
+        &self.array
+    }
+
     /// Return the number of coordinates stored in these `Coords`.
     pub fn len(&self) -> usize {
         self.array.elements() as usize / self.ndim
