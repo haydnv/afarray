@@ -22,6 +22,14 @@ pub struct Coords {
 }
 
 impl Coords {
+    /// Constructs `Coords` with the given `size` full of zeros (origin points) for the given shape.
+    pub fn empty(shape: &[u64], size: usize) -> Self {
+        let ndim = shape.len();
+        let dims = af::Dim4::new(&[ndim as u64, size as u64, 1, 1]);
+        let array = af::constant(0u64, dims);
+        Self { array, ndim }
+    }
+
     /// Constructs a new `Coords` from an iterator of [`Coord`]s.
     ///
     /// Panics: if any [`Coord`] is not of length `ndim`.
@@ -59,7 +67,7 @@ impl Coords {
 
     /// Constructs a new `Coords` from a [`Stream`] of [`Coord`]s.
     ///
-    /// Panics: if any [`Coord`] has a length other than `ndim`.
+    /// Panics: if any [`Coord`] has a length other than `ndim`
     pub async fn from_stream<S: Stream<Item = Coord> + Unpin>(
         mut source: S,
         ndim: usize,
@@ -85,7 +93,7 @@ impl Coords {
 
     /// Constructs a new `Coords` from a [`TryStream`] of `Coord`s.
     ///
-    /// Panics: if any `Coord` has a length other than `ndim`.
+    /// Panics: if any [`Coord`] has a length other than `ndim`
     pub async fn try_from_stream<E, S: TryStream<Ok = Coord, Error = E> + Unpin>(
         mut source: S,
         ndim: usize,
@@ -110,8 +118,15 @@ impl Coords {
     }
 
     /// Borrow these `Coords` as an `af::Array<u64>`.
+    #[inline]
     pub fn af(&self) -> &af::Array<u64> {
         &self.array
+    }
+
+    /// Borrow these `Coords` mutably as an `af::Array<u64>`.
+    #[inline]
+    pub fn af_mut(&mut self) -> &mut af::Array<u64> {
+        &mut self.array
     }
 
     /// Return the number of coordinates stored in these `Coords`.
@@ -122,6 +137,25 @@ impl Coords {
     /// Return the number of dimensions of these `Coords`.
     pub fn ndim(&self) -> usize {
         self.ndim
+    }
+
+    /// Construct a new `Coords` from the selected indices.
+    ///
+    /// Panics: if any index is out of bounds
+    pub fn get(&self, index: af::Indexer) -> Self {
+        let array = af::index_gen(self.af(), index);
+        let ndim = array.dims()[0] as usize;
+        let num_coords = array.elements() / ndim;
+        let dims = af::Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]);
+        let array = af::moddims(&array, dims);
+        Self { array, ndim }
+    }
+
+    /// Update these `Coords` by writing the given `value` at the given `index`.
+    ///
+    /// Panics: if any index is out of bounds
+    pub fn set(&mut self, index: &af::Indexer, value: Self) {
+        af::assign_gen(self.af_mut(), index, value.af());
     }
 
     /// Return these `Coords` as [`Offsets`] with respect to the given shape.
@@ -141,11 +175,13 @@ impl Coords {
 
     /// Return a list of [`Coord`]s from these `Coords`.
     ///
-    /// Panics: if the given number of dimensions does not fit the set of coordinates.
+    /// Panics: if the given number of dimensions does not fit the set of coordinates
     pub fn to_vec(&self) -> Vec<Vec<u64>> {
         assert_eq!(self.array.elements() % self.ndim, 0);
+
         let mut to_vec = vec![0u64; self.array.elements()];
         self.array.host(&mut to_vec);
+
         to_vec
             .chunks(self.ndim)
             .map(|coord| coord.to_vec())
@@ -160,6 +196,7 @@ impl Coords {
     }
 }
 
+/// A [`Stream`] of [`Coords`], as constructed from an input stream of [`Coord`]s.
 pub struct CoordBlocks<S> {
     source: Fuse<S>,
     ndim: usize,
@@ -168,6 +205,7 @@ pub struct CoordBlocks<S> {
 }
 
 impl<E, S: Stream<Item = Result<Coord, E>>> CoordBlocks<S> {
+    /// Construct a new `CoordBlocks`.
     pub fn new(source: S, ndim: usize, block_size: usize) -> Self {
         Self {
             source: source.fuse(),
@@ -187,6 +225,7 @@ impl<E, S: Stream<Item = Result<Coord, E>>> CoordBlocks<S> {
             array: af::Array::new(&self.buffer, dims),
             ndim: self.ndim,
         };
+
         self.buffer.clear();
         coords
     }
@@ -226,5 +265,31 @@ mod tests {
             coords.into_vec(),
             vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1], vec![2, 0],]
         )
+    }
+
+    #[test]
+    fn test_get_and_set() {
+        let source = Coords::from_iter(vec![vec![0, 1, 2], vec![3, 4, 5], vec![6, 7, 8]], 3);
+
+        let indices = af::Array::new(&[1, 2], dim4(2));
+        let seq4gen = af::Seq::new(0., 2., 1.);
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&indices, 0, None);
+        indexer.set_index(&seq4gen, 1, Some(true));
+
+        let value = source.get(indexer);
+
+        assert_eq!(value.ndim(), 2);
+        assert_eq!(value.to_vec(), vec![vec![1, 2], vec![4, 5], vec![7, 8]]);
+
+        let mut dest = Coords::empty(&[10, 15, 20], 3);
+
+        let indices = af::Array::new(&[0, 2], dim4(2));
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&indices, 0, None);
+        indexer.set_index(&seq4gen, 1, Some(true));
+        dest.set(&indexer, value);
+
+        assert_eq!(dest.to_vec(), vec![[1, 0, 2], [4, 0, 5], [7, 0, 8],])
     }
 }
