@@ -11,7 +11,6 @@ use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
 use super::{dim4, Complex};
-use arrayfire::Dim4;
 
 const BATCH: bool = true;
 
@@ -235,21 +234,15 @@ impl ArrayExt<u64> {
 
     /// Construct a new [`af::Array`] of coordinates from this `ArrayExt<u64>` of offsets.
     pub fn to_coords(&self, shape: &[u64]) -> af::Array<u64> {
-        let ndim = shape.len();
-        let num_coords = self.len();
+        let ndim = shape.len() as u64;
         let coord_bounds = coord_bounds(shape);
 
-        let af_coord_bounds: af::Array<u64> =
-            af::Array::new(&coord_bounds, af::Dim4::new(&[ndim as u64, 1, 1, 1]));
-
-        let af_shape: af::Array<u64> =
-            af::Array::new(&shape.to_vec(), af::Dim4::new(&[1, ndim as u64, 1, 1]));
+        let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, af::Dim4::new(&[1, ndim, 1, 1]));
+        let af_shape: af::Array<u64> = af::Array::new(&shape.to_vec(), af::Dim4::new(&[1, ndim, 1, 1]));
 
         let offsets = af::div(self.af(), &af_coord_bounds, true);
-        let offsets = af::modulo(&offsets, &af_shape, true);
-
-        let coords = af::transpose(&offsets, false);
-        af::moddims(&coords, Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]))
+        let coords = af::modulo(&offsets, &af_shape, true);
+        af::transpose(&coords, false)
     }
 }
 
@@ -999,6 +992,19 @@ impl<T: af::HasAfEnum + fmt::Display + Default + Clone> fmt::Display for ArrayEx
     }
 }
 
+/// Return a list of `Vec<u64>` coordinates from the given [`af::Array<u64>`].
+pub fn to_coords(coords: &af::Array<u64>, ndim: usize) -> Vec<Vec<u64>> {
+    assert_eq!(coords.elements() % ndim, 0);
+    let mut to_vec = vec![0u64; coords.elements()];
+    coords.host(&mut to_vec);
+    to_vec.chunks(ndim).map(|coord| coord.to_vec()).collect()
+}
+
+/// Convert the given [`af::Array<u64>`] into a list of `Vec<u64>` coordinates.
+pub fn into_coords(coords: af::Array<u64>, ndim: usize) -> Vec<Vec<u64>> {
+    to_coords(&coords, ndim)
+}
+
 #[derive(Default)]
 struct ArrayExtVisitor<T> {
     phantom: PhantomData<T>,
@@ -1199,5 +1205,18 @@ mod tests {
     fn test_range() {
         let range = ArrayExt::range(1, 10);
         assert_eq!(range.to_vec(), (1..10).collect::<Vec<u64>>())
+    }
+
+    #[test]
+    fn test_to_coords() {
+        let offsets = ArrayExt::range(0, 5);
+        let coords = offsets.to_coords(&[5, 2]);
+        assert_eq!(into_coords(coords, 2), vec![
+            vec![0, 0],
+            vec![0, 1],
+            vec![1, 0],
+            vec![1, 1],
+            vec![2, 0],
+        ])
     }
 }
