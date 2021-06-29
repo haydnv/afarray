@@ -10,7 +10,7 @@ use futures::{future, stream, Stream};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use super::{dim4, Complex};
+use super::{coord_bounds, dim4, Complex};
 
 const BATCH: bool = true;
 
@@ -203,43 +203,6 @@ impl ArrayExt<u64> {
         } else {
             af::add(&range, &af::Array::new(&[start], dim4(1)), true).into()
         }
-    }
-
-    /// Construct a new `ArrayExt<u64>` of offsets from a list of `Vec<u64>` coordinates.
-    ///
-    /// Panics: if any coordinate has length not equal to `shape.len()`.
-    pub fn from_coords<C: IntoIterator<Item = Vec<u64>>>(coords: C, shape: &[u64]) -> Self {
-        let ndim = shape.len();
-
-        let coords: Vec<u64> = coords
-            .into_iter()
-            .inspect(|coord| assert!(coord.len() == ndim))
-            .flatten()
-            .collect();
-
-        let num_coords = coords.len() / ndim;
-
-        let coords = af::Array::new(
-            &coords,
-            af::Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]),
-        );
-
-        to_offsets(&coords, shape)
-    }
-
-    /// Construct a new [`af::Array`] of coordinates from this `ArrayExt<u64>` of offsets.
-    pub fn to_coords(&self, shape: &[u64]) -> af::Array<u64> {
-        let ndim = shape.len() as u64;
-        let coord_bounds = coord_bounds(shape);
-
-        let af_coord_bounds: af::Array<u64> =
-            af::Array::new(&coord_bounds, af::Dim4::new(&[1, ndim, 1, 1]));
-        let af_shape: af::Array<u64> =
-            af::Array::new(&shape.to_vec(), af::Dim4::new(&[1, ndim, 1, 1]));
-
-        let offsets = af::div(self.af(), &af_coord_bounds, true);
-        let coords = af::modulo(&offsets, &af_shape, true);
-        af::transpose(&coords, false)
     }
 }
 
@@ -1061,19 +1024,6 @@ impl<T: af::HasAfEnum + fmt::Display + Default + Clone> fmt::Display for ArrayEx
     }
 }
 
-/// Return a list of `Vec<u64>` coordinates from the given [`af::Array<u64>`].
-pub fn to_coords(coords: &af::Array<u64>, ndim: usize) -> Vec<Vec<u64>> {
-    assert_eq!(coords.elements() % ndim, 0);
-    let mut to_vec = vec![0u64; coords.elements()];
-    coords.host(&mut to_vec);
-    to_vec.chunks(ndim).map(|coord| coord.to_vec()).collect()
-}
-
-/// Convert the given [`af::Array<u64>`] into a list of `Vec<u64>` coordinates.
-pub fn into_coords(coords: af::Array<u64>, ndim: usize) -> Vec<Vec<u64>> {
-    to_coords(&coords, ndim)
-}
-
 /// Convert the given [`af::Array<u64>`] into an [`ArrayExt<u64>`] of offsets using the given shape.
 pub fn to_offsets(coords: &af::Array<u64>, shape: &[u64]) -> ArrayExt<u64> {
     let ndim = shape.len();
@@ -1268,32 +1218,5 @@ impl de::Visitor for ArrayExtVisitor<i64> {
         access: A,
     ) -> Result<Self::Value, A::Error> {
         Self::visit_array(access).await
-    }
-}
-
-fn coord_bounds(shape: &[u64]) -> Vec<u64> {
-    (0..shape.len())
-        .map(|axis| shape[axis + 1..].iter().product())
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_range() {
-        let range = ArrayExt::range(1, 10);
-        assert_eq!(range.to_vec(), (1..10).collect::<Vec<u64>>())
-    }
-
-    #[test]
-    fn test_to_coords() {
-        let offsets = ArrayExt::range(0, 5);
-        let coords = offsets.to_coords(&[5, 2]);
-        assert_eq!(
-            into_coords(coords, 2),
-            vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1], vec![2, 0],]
-        )
     }
 }

@@ -1,10 +1,11 @@
 //! Provides a generic one-dimensional [`Array`] which wraps [`arrayfire::Array`] and supports
-//! all [`number_general::NumberType`] variants. `Array` supports basic math like `Add`, `Sub`,
-//! `Mul`, and `Div`, with hardware acceleration on systems which support CUDA or OpenCL.
-//! `ArrayExt<bool>` supports common logical operations `and`, `not`, `or`, and `xor`.
+//! all [`number_general::NumberType`] variants. `Array` and `ArrayExt` support basic math like
+//! `Add`, `Sub`, `Mul`, `Div`, and `Rem`, with hardware acceleration on systems which support CUDA
+//! or OpenCL. `ArrayExt<bool>` supports common logical operations `and`, `not`, `or`, and `xor`.
 //!
-//! N-dimensional array functionality can be implemented using `ArrayExt<u64>`, which provides
-//! methods `to_coords` and `from_coords` and can be used to index an `Array`.
+//! N-dimensional array functionality can be implemented using `Coords` and `Offsets`, which
+//! provide methods for indexing a one-dimensional `Array` or `ArrayExt` as an n-dimensional
+//! tensor.
 //!
 //! `Array` supports (de)serialization without type hinting. `ArrayExt<T>` supports serialization
 //! for `T: Serialize` and deserialization for `T: Deserialize`.
@@ -22,20 +23,22 @@
 //! assert_eq!(product.sum(), Number::from(30))
 //! ```
 //!
-//! This crate depends on ArrayFire version 3.8 or later. You will have to install ArrayFire
-//! separately by following the instructions at
+//! This crate depends on ArrayFire version 3.8. You will have to install ArrayFire separately by
+//! following the instructions at
 //! [https://arrayfire.org/docs/installing.htm](https://arrayfire.org/docs/installing.htm)
 //! in order to build this crate.
 //!
-//! You can find detailed instructions for building the Rust `arrayfire` crate from crates.io
-//! at [https://crates.io/crates/arrayfire](https://crates.io/crates/arrayfire).
+//! You can find detailed instructions for building the Rust `arrayfire` crate from crates.io at
+//! [https://crates.io/crates/arrayfire](https://crates.io/crates/arrayfire).
 
 use std::fmt;
 
 pub use array::*;
+pub use coords::*;
 pub use ext::*;
 
 mod array;
+mod coords;
 mod ext;
 
 pub type Complex<T> = num_complex::Complex<T>;
@@ -71,6 +74,14 @@ fn error<I: fmt::Display>(message: I) -> ArrayError {
     }
 }
 
+#[inline]
 fn dim4(size: usize) -> arrayfire::Dim4 {
     arrayfire::Dim4::new(&[size as u64, 1, 1, 1])
+}
+
+#[inline]
+fn coord_bounds(shape: &[u64]) -> Vec<u64> {
+    (0..shape.len())
+        .map(|axis| shape[axis + 1..].iter().product())
+        .collect()
 }
