@@ -1,3 +1,4 @@
+use std::iter::IntoIterator;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -21,14 +22,30 @@ pub struct Coords {
 }
 
 impl Coords {
+    /// Constructs a new `Coords` from an iterator of [`Coord`]s.
+    ///
+    /// Panics: if any [`Coord`] is not of length `ndim`.
+    pub fn from_iter<I: IntoIterator<Item = Coord>>(iter: I, ndim: usize) -> Self {
+        let buffer: Vec<u64> = iter
+            .into_iter()
+            .inspect(|coord| assert_eq!(coord.len(), ndim))
+            .flatten()
+            .collect();
+
+        let num_coords = buffer.len() / ndim;
+        let dims = af::Dim4::new(&[ndim as u64, num_coords as u64, 1, 1]);
+        let array = af::Array::new(&buffer, dims);
+        Self { array, ndim }
+    }
+
     /// Constructs a new `Coords` from an [`ArrayExt`] of offsets with respect to the given shape.
     pub fn from_offsets(offsets: Offsets, shape: &[u64]) -> Self {
         let ndim = shape.len() as u64;
         let coord_bounds = coord_bounds(shape);
 
-        let af_coord_bounds: af::Array<u64> =
-            af::Array::new(&coord_bounds, af::Dim4::new(&[1, ndim, 1, 1]));
-        let af_shape: af::Array<u64> = af::Array::new(&shape, af::Dim4::new(&[1, ndim, 1, 1]));
+        let dims = af::Dim4::new(&[1, ndim, 1, 1]);
+        let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, dims);
+        let af_shape: af::Array<u64> = af::Array::new(&shape, dims);
 
         let offsets = af::div(offsets.af(), &af_coord_bounds, true);
         let coords = af::modulo(&offsets, &af_shape, true);
@@ -124,7 +141,10 @@ impl Coords {
         assert_eq!(self.array.elements() % self.ndim, 0);
         let mut to_vec = vec![0u64; self.array.elements()];
         self.array.host(&mut to_vec);
-        to_vec.chunks(self.ndim).map(|coord| coord.to_vec()).collect()
+        to_vec
+            .chunks(self.ndim)
+            .map(|coord| coord.to_vec())
+            .collect()
     }
 
     /// Convert these `Coords` into a list of [`Coord`]s.
