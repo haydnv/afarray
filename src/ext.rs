@@ -114,6 +114,7 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     where
         T: af::RealNumber,
     {
+        debug_assert_eq!(self.0.dims(), dim4(self.len()));
         *self = Self(af::sort(&self.0, 0, ascending))
     }
 
@@ -1080,7 +1081,8 @@ pub fn to_offsets(coords: &af::Array<u64>, shape: &[u64]) -> ArrayExt<u64> {
     let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, dim4(ndim));
 
     let offsets = af::mul(coords, &af_coord_bounds, true);
-    af::sum(&offsets, 0).into()
+    let offsets = af::sum(&offsets, 0).into();
+    ArrayExt(af::moddims(&offsets, dim4(offsets.elements())))
 }
 
 #[derive(Default)]
