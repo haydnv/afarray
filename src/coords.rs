@@ -14,7 +14,10 @@ pub type Coord = Vec<u64>;
 pub type Offsets = ArrayExt<u64>;
 
 /// A hardware-accelerated set of n-dimensional coordinates, all with the same dimension.
-pub struct Coords(af::Array<u64>);
+pub struct Coords {
+    array: af::Array<u64>,
+    ndim: usize,
+}
 
 impl Coords {
     /// Constructs a new `Coords` from an [`ArrayExt`] of offsets with respect to the given shape.
@@ -29,7 +32,9 @@ impl Coords {
 
         let offsets = af::div(offsets.af(), &af_coord_bounds, true);
         let coords = af::modulo(&offsets, &af_shape, true);
-        Self(af::transpose(&coords, false))
+        let array = af::transpose(&coords, false);
+
+        Self { array, ndim: shape.len() }
     }
 
     /// Constructs a new `Coords` from a [`Stream`] of [`Coord`]s.
@@ -53,10 +58,12 @@ impl Coords {
             num_coords += 1;
         }
 
-        Self(af::Array::new(
+        let array = af::Array::new(
             &buffer,
             af::Dim4::new(&[ndim as u64, num_coords, 1, 1]),
-        ))
+        );
+
+        Self { array, ndim }
     }
 
     /// Constructs a new `Coords` from a [`TryStream`] of `Coord`s.
@@ -80,19 +87,31 @@ impl Coords {
             num_coords += 1;
         }
 
-        Ok(Self(af::Array::new(
+        let array = af::Array::new(
             &buffer,
             af::Dim4::new(&[ndim as u64, num_coords, 1, 1]),
-        )))
+        );
+
+        Ok(Self { array, ndim })
+    }
+
+    /// Return the number of coordinates stored in these `Coords`.
+    pub fn len(&self) -> usize {
+        self.array.elements() as usize / self.ndim
+    }
+
+    /// Return the number of dimensions of these `Coords`.
+    pub fn ndim(&self) -> usize {
+        self.ndim
     }
 
     /// Return a list of [`Coord`]s from these `Coords`.
     ///
     /// Panics: if the given number of dimensions does not fit the set of coordinates.
     pub fn to_vec(&self, ndim: usize) -> Vec<Vec<u64>> {
-        assert_eq!(self.0.elements() % ndim, 0);
-        let mut to_vec = vec![0u64; self.0.elements()];
-        self.0.host(&mut to_vec);
+        assert_eq!(self.array.elements() % ndim, 0);
+        let mut to_vec = vec![0u64; self.array.elements()];
+        self.array.host(&mut to_vec);
         to_vec.chunks(ndim).map(|coord| coord.to_vec()).collect()
     }
 
@@ -122,11 +141,14 @@ impl<E, S: Stream<Item = Result<Coord, E>>> CoordBlocks<S> {
     }
 
     fn consume_buffer(&mut self) -> Coords {
+        assert_eq!(self.buffer.len() % self.ndim, 0);
+
         let ndim = self.ndim as u64;
         let num_coords = (self.buffer.len() / self.ndim) as u64;
         let dims = af::Dim4::new(&[ndim, num_coords, 1, 1]);
+        let coords = Coords { array: af::Array::new(&self.buffer, dims), ndim: self.ndim };
         self.buffer.clear();
-        Coords(af::Array::new(&self.buffer, dims))
+        coords
     }
 }
 
@@ -140,7 +162,7 @@ impl<E, S: Stream<Item = Result<Coord, E>> + Unpin> Stream for CoordBlocks<S> {
                     assert_eq!(coord.len(), self.ndim);
                     self.buffer.extend(coord);
 
-                    if self.buffer.len() == self.block_size {
+                    if self.buffer.len() == (self.block_size * self.ndim) {
                         break Some(Ok(self.consume_buffer()));
                     }
                 }
@@ -155,12 +177,6 @@ impl<E, S: Stream<Item = Result<Coord, E>> + Unpin> Stream for CoordBlocks<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_range() {
-        let range = ArrayExt::range(1, 10);
-        assert_eq!(range.to_vec(), (1..10).collect::<Vec<u64>>())
-    }
 
     #[test]
     fn test_to_coords() {

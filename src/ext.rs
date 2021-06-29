@@ -1220,3 +1220,14 @@ impl de::Visitor for ArrayExtVisitor<i64> {
         Self::visit_array(access).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_range() {
+        let range = ArrayExt::range(1, 10);
+        assert_eq!(range.to_vec(), (1..10).collect::<Vec<u64>>())
+    }
+}
