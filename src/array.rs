@@ -1058,13 +1058,39 @@ impl<'en> en::IntoStream<'en> for Array {
 
 impl fmt::Debug for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(self, f)
+        match self {
+            Self::Bool(array) => fmt::Debug::fmt(array, f),
+            Self::C32(array) => fmt::Debug::fmt(array, f),
+            Self::C64(array) => fmt::Debug::fmt(array, f),
+            Self::F32(array) => fmt::Debug::fmt(array, f),
+            Self::F64(array) => fmt::Debug::fmt(array, f),
+            Self::I16(array) => fmt::Debug::fmt(array, f),
+            Self::I32(array) => fmt::Debug::fmt(array, f),
+            Self::I64(array) => fmt::Debug::fmt(array, f),
+            Self::U8(array) => fmt::Debug::fmt(array, f),
+            Self::U16(array) => fmt::Debug::fmt(array, f),
+            Self::U32(array) => fmt::Debug::fmt(array, f),
+            Self::U64(array) => fmt::Debug::fmt(array, f),
+        }
     }
 }
 
 impl fmt::Display for Array {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Array<{}>", self.dtype())
+        match self {
+            Self::Bool(array) => fmt::Display::fmt(array, f),
+            Self::C32(array) => fmt::Display::fmt(array, f),
+            Self::C64(array) => fmt::Display::fmt(array, f),
+            Self::F32(array) => fmt::Display::fmt(array, f),
+            Self::F64(array) => fmt::Display::fmt(array, f),
+            Self::I16(array) => fmt::Display::fmt(array, f),
+            Self::I32(array) => fmt::Display::fmt(array, f),
+            Self::I64(array) => fmt::Display::fmt(array, f),
+            Self::U8(array) => fmt::Display::fmt(array, f),
+            Self::U16(array) => fmt::Display::fmt(array, f),
+            Self::U32(array) => fmt::Display::fmt(array, f),
+            Self::U64(array) => fmt::Display::fmt(array, f),
+        }
     }
 }
 
