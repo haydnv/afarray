@@ -10,7 +10,7 @@ use futures::{future, stream, Stream};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use super::{coord_bounds, dim4, Complex};
+use super::{dim4, Complex};
 
 const BATCH: bool = true;
 
@@ -1022,17 +1022,6 @@ impl<T: af::HasAfEnum + fmt::Display + Default + Clone> fmt::Display for ArrayEx
 
         write!(f, "[{}]", as_str)
     }
-}
-
-/// Convert the given [`af::Array<u64>`] into an [`ArrayExt<u64>`] of offsets using the given shape.
-pub fn to_offsets(coords: &af::Array<u64>, shape: &[u64]) -> ArrayExt<u64> {
-    let ndim = shape.len();
-    let coord_bounds = coord_bounds(shape);
-    let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, dim4(ndim));
-
-    let offsets = af::mul(coords, &af_coord_bounds, true);
-    let offsets = af::sum(&offsets, 0).into();
-    ArrayExt(af::moddims(&offsets, dim4(offsets.elements())))
 }
 
 #[derive(Default)]

@@ -5,7 +5,7 @@ use arrayfire as af;
 use futures::ready;
 use futures::stream::{Fuse, Stream, StreamExt, TryStream, TryStreamExt};
 
-use super::{coord_bounds, ArrayExt, ArrayInstance};
+use super::{coord_bounds, dim4, ArrayExt, ArrayInstance};
 
 /// An n-dimensional coordinate.
 pub type Coord = Vec<u64>;
@@ -27,14 +27,16 @@ impl Coords {
 
         let af_coord_bounds: af::Array<u64> =
             af::Array::new(&coord_bounds, af::Dim4::new(&[1, ndim, 1, 1]));
-        let af_shape: af::Array<u64> =
-            af::Array::new(&shape, af::Dim4::new(&[1, ndim, 1, 1]));
+        let af_shape: af::Array<u64> = af::Array::new(&shape, af::Dim4::new(&[1, ndim, 1, 1]));
 
         let offsets = af::div(offsets.af(), &af_coord_bounds, true);
         let coords = af::modulo(&offsets, &af_shape, true);
         let array = af::transpose(&coords, false);
 
-        Self { array, ndim: shape.len() }
+        Self {
+            array,
+            ndim: shape.len(),
+        }
     }
 
     /// Constructs a new `Coords` from a [`Stream`] of [`Coord`]s.
@@ -58,10 +60,7 @@ impl Coords {
             num_coords += 1;
         }
 
-        let array = af::Array::new(
-            &buffer,
-            af::Dim4::new(&[ndim as u64, num_coords, 1, 1]),
-        );
+        let array = af::Array::new(&buffer, af::Dim4::new(&[ndim as u64, num_coords, 1, 1]));
 
         Self { array, ndim }
     }
@@ -87,10 +86,7 @@ impl Coords {
             num_coords += 1;
         }
 
-        let array = af::Array::new(
-            &buffer,
-            af::Dim4::new(&[ndim as u64, num_coords, 1, 1]),
-        );
+        let array = af::Array::new(&buffer, af::Dim4::new(&[ndim as u64, num_coords, 1, 1]));
 
         Ok(Self { array, ndim })
     }
@@ -103,6 +99,21 @@ impl Coords {
     /// Return the number of dimensions of these `Coords`.
     pub fn ndim(&self) -> usize {
         self.ndim
+    }
+
+    /// Return these `Coords` as [`Offsets`] with respect to the given shape.
+    ///
+    /// Panics: if `shape.len()` does not equal `self.ndim()`
+    pub fn to_offsets(&self, shape: &[u64]) -> ArrayExt<u64> {
+        let ndim = shape.len();
+        assert_eq!(self.ndim, ndim);
+
+        let coord_bounds = coord_bounds(shape);
+        let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, dim4(ndim));
+
+        let offsets = af::mul(&self.array, &af_coord_bounds, true);
+        let offsets = af::sum(&offsets, 0).into();
+        af::moddims(&offsets, dim4(offsets.elements())).into()
     }
 
     /// Return a list of [`Coord`]s from these `Coords`.
@@ -146,7 +157,10 @@ impl<E, S: Stream<Item = Result<Coord, E>>> CoordBlocks<S> {
         let ndim = self.ndim as u64;
         let num_coords = (self.buffer.len() / self.ndim) as u64;
         let dims = af::Dim4::new(&[ndim, num_coords, 1, 1]);
-        let coords = Coords { array: af::Array::new(&self.buffer, dims), ndim: self.ndim };
+        let coords = Coords {
+            array: af::Array::new(&self.buffer, dims),
+            ndim: self.ndim,
+        };
         self.buffer.clear();
         coords
     }
