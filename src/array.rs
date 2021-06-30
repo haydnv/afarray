@@ -1240,7 +1240,6 @@ mod tests {
         assert_eq!(&a - &b, [0, 1, 2][..].into());
 
         let b: Array = [3, 2, 1][..].into();
-        println!("{:?}", (&a - &b).to_vec());
         assert_eq!(&a - &b, [-2, 0, 2][..].into());
     }
 

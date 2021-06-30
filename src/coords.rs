@@ -153,6 +153,67 @@ impl Coords {
         self.get(indexer)
     }
 
+    /// Transpose these `Coords` according to the given `permutation`.
+    ///
+    /// If no permutation is given, the coordinate axes will be inverted.
+    pub fn transpose(&self, permutation: Option<&[u64]>) -> Coords {
+        if let Some(permutation) = permutation {
+            let index = af::Array::new(permutation, dim4(permutation.len()));
+            let seq4gen = af::Seq::new(0., (self.len() - 1) as f64, 1.);
+
+            let mut indexer = af::Indexer::default();
+            indexer.set_index(&index, 0, None);
+            indexer.set_index(&seq4gen, 1, Some(true));
+            self.get(indexer)
+        } else {
+            let array = af::transpose(&self.array, false);
+            let ndim = self.ndim;
+            Self { array, ndim }
+        }
+    }
+
+    /// Invert the given broadcast of these `Coords`.
+    ///
+    /// Panics: if `source_shape` and `broadcast` are not the same length.
+    pub fn unbroadcast(&self, source_shape: &[u64], broadcast: &[bool]) -> Coords {
+        assert_eq!(self.ndim(), broadcast.len());
+
+        let offset = self.ndim() - source_shape.len();
+        let mut coords = Self::empty(source_shape, self.len());
+        if source_shape.is_empty() || broadcast.iter().all(|b| *b) {
+            return coords;
+        }
+
+        let axes: Vec<u64> = broadcast
+            .iter()
+            .enumerate()
+            .filter_map(|(x, b)| if *b { None } else { Some(x as u64) })
+            .collect();
+
+        let index = af::Array::new(&axes, dim4(axes.len()));
+        let seq4gen = af::Seq::new(0., (self.len() - 1) as f64, 1.);
+
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&index, 0, None);
+        indexer.set_index(&seq4gen, 1, Some(true));
+        let unbroadcasted = self.get(indexer);
+
+
+        let axes: Vec<u64> = broadcast
+            .iter()
+            .enumerate()
+            .filter_map(|(x, b)| if *b { None } else { Some((x - offset) as u64) })
+            .collect();
+
+        let index = af::Array::new(&axes, dim4(axes.len()));
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&index, 0, None);
+        indexer.set_index(&seq4gen, 1, Some(true));
+        coords.set(&indexer, unbroadcasted);
+
+        coords
+    }
+
     /// Construct a new `Coords` from the selected indices.
     ///
     /// Panics: if any index is out of bounds
@@ -305,5 +366,12 @@ mod tests {
         dest.set(&indexer, value);
 
         assert_eq!(dest.to_vec(), vec![[1, 0, 2], [4, 0, 5], [7, 0, 8],])
+    }
+
+    #[test]
+    fn test_unbroadcast() {
+        let coords = Coords::from_iter(vec![vec![8, 15, 2, 1, 10, 3], vec![9, 16, 3, 4, 11, 6]], 6);
+        let actual = coords.unbroadcast(&[5, 1, 1, 10], &[true, true, false, true, true, false]);
+        assert_eq!(actual.to_vec(), vec![vec![2, 0, 0, 3], vec![3, 0, 0, 6]]);
     }
 }
