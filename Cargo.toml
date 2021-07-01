@@ -23,6 +23,7 @@ num-complex = "0.2"
 num-derive = "0.3"
 num-traits = "0.2"
 number-general = "~0.3.7"
+pin-project = "1.0"
 safecast = "0.1"
 serde = "1.0"
 

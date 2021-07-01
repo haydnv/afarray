@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::iter::IntoIterator;
+use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use arrayfire as af;
 use futures::ready;
-use futures::stream::{Fuse, Stream, StreamExt, TryStream, TryStreamExt};
+use futures::stream::{Fuse, FusedStream, Stream, StreamExt, TryStream, TryStreamExt};
+use pin_project::pin_project;
 
 use super::{coord_bounds, dim4, ArrayExt, ArrayInstance};
 
@@ -130,6 +132,11 @@ impl Coords {
         &mut self.array
     }
 
+    /// Returns true if the number of coordinates in these `Coords` is zero.
+    pub fn is_empty(&self) -> bool {
+        self.array.elements() == 0
+    }
+
     /// Return the number of coordinates stored in these `Coords`.
     pub fn len(&self) -> usize {
         self.array.elements() as usize / self.ndim
@@ -138,6 +145,77 @@ impl Coords {
     /// Return the number of dimensions of these `Coords`.
     pub fn ndim(&self) -> usize {
         self.ndim
+    }
+
+    fn first(&self) -> Coord {
+        let dim0 = af::Seq::new(0., (self.ndim - 1) as f32, 1.);
+        let dim1 = af::Seq::new(0., 0., 1.);
+        let slice = af::index(self.af(), &[dim0, dim1]);
+        let mut first = vec![0; self.ndim];
+        slice.host(&mut first);
+        first
+    }
+
+    fn last(&self) -> Coord {
+        let i = (self.len() - 1) as f32;
+        let dim0 = af::Seq::new(0., (self.ndim - 1) as f32, 1.);
+        let dim1 = af::Seq::new(i, i, 1.);
+        let slice = af::index(self.af(), &[dim0, dim1]);
+        let mut first = vec![0; self.ndim];
+        slice.host(&mut first);
+        first
+    }
+
+    fn append(&self, other: &Coords) -> Self {
+        assert_eq!(self.ndim, other.ndim);
+
+        let array = af::join(0, self.af(), other.af());
+        Self {
+            array,
+            ndim: self.ndim,
+        }
+    }
+
+    fn split(&self, at: usize) -> (Self, Self) {
+        assert!(at > 0);
+        assert!(at < self.len());
+
+        let left = af::Seq::new(0., (at - 1) as f32, 1.);
+        let right = af::Seq::new(at as f32, (self.len() - 1) as f32, 1.);
+
+        let left = af::index(self.af(), &[af::Seq::default(), left]);
+        let right = af::index(self.af(), &[af::Seq::default(), right]);
+        (
+            Self {
+                array: left,
+                ndim: self.ndim,
+            },
+            Self {
+                array: right,
+                ndim: self.ndim,
+            },
+        )
+    }
+
+    fn split_lt(&self, lt: Coord, shape: &[u64]) -> (Self, Self) {
+        assert_eq!(lt.len(), self.ndim);
+        assert_eq!(shape.len(), self.ndim);
+
+        let coord_bounds = coord_bounds(shape);
+        let pivot = coord_to_offset(&lt, &coord_bounds);
+        let pivot = af::Array::new(&[pivot], dim4(1));
+        let offsets = self.to_offsets(shape);
+        let left = af::lt(offsets.af(), &pivot, true);
+        let (pivot, _) = af::sum_all(&left);
+        self.split(pivot as usize)
+    }
+
+    fn sorted(&self) -> Self {
+        let array = af::sort(self.af(), 1, true);
+        Self {
+            array,
+            ndim: self.ndim,
+        }
     }
 
     /// Return a copy of these `Coords` without the specified axis.
@@ -371,6 +449,177 @@ impl<E, S: Stream<Item = Result<Coord, E>> + Unpin> Stream for CoordBlocks<S> {
     }
 }
 
+impl<E, S: Stream<Item = Result<Coord, E>> + Unpin> FusedStream for CoordBlocks<S> {
+    fn is_terminated(&self) -> bool {
+        self.source.is_terminated() && self.buffer.is_empty()
+    }
+}
+
+/// Stream for merging two sorted [`CoordBlocks`] streams.
+///
+/// The behavior of `CoordMerge` is undefined if the input streams are not sorted.
+#[pin_project]
+pub struct CoordMerge<L, R> {
+    #[pin]
+    left: CoordBlocks<L>,
+
+    #[pin]
+    right: CoordBlocks<R>,
+
+    pending_left: Option<Coords>,
+    pending_right: Option<Coords>,
+    buffer: Option<Coords>,
+    block_size: usize,
+    shape: Vec<u64>,
+}
+
+impl<L, R> CoordMerge<L, R> {
+    /// Construct a new `CoordMerge` stream.
+    ///
+    /// Panics: if the dimensions of `left`, `right`, and `shape` do not match,
+    /// or if block_size is zero.
+    pub fn new(
+        left: CoordBlocks<L>,
+        right: CoordBlocks<R>,
+        shape: Vec<u64>,
+        block_size: usize,
+    ) -> Self {
+        assert!(block_size > 0);
+        assert_eq!(left.ndim, right.ndim);
+        assert_eq!(left.ndim, shape.len());
+
+        Self {
+            left,
+            right,
+
+            shape,
+            block_size,
+
+            pending_left: None,
+            pending_right: None,
+            buffer: None,
+        }
+    }
+}
+
+impl<E, L, R> Stream for CoordMerge<L, R>
+where
+    L: Stream<Item = Result<Coord, E>> + Unpin,
+    R: Stream<Item = Result<Coord, E>> + Unpin,
+{
+    type Item = Result<Coords, E>;
+
+    fn poll_next(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+
+        if this.pending_left.is_none() && !this.left.is_terminated() {
+            match ready!(this.left.poll_next(cxt)) {
+                Some(Ok(coords)) => *this.pending_left = Some(coords),
+                Some(Err(cause)) => return Poll::Ready(Some(Err(cause))),
+                None => {}
+            }
+        }
+
+        if this.pending_right.is_none() && !this.right.is_terminated() {
+            match ready!(this.right.poll_next(cxt)) {
+                Some(Ok(coords)) => *this.pending_right = Some(coords),
+                Some(Err(cause)) => return Poll::Ready(Some(Err(cause))),
+                None => {}
+            }
+        }
+
+        Poll::Ready(loop {
+            match (&mut *this.pending_left, &mut *this.pending_right) {
+                (Some(l), Some(r)) if l.last() < r.first() => {
+                    let mut l = None;
+                    mem::swap(this.pending_left, &mut l);
+                    create_or_append(this.buffer, l.unwrap());
+                }
+                (Some(l), Some(r)) if r.last() < l.first() => {
+                    let mut r = None;
+                    mem::swap(this.pending_right, &mut r);
+                    create_or_append(this.buffer, r.unwrap());
+                }
+                (Some(l), Some(r)) if l.first() < r.first() => {
+                    let (l, l_pending) = l.split_lt(r.first(), this.shape);
+                    *this.pending_left = Some(l_pending);
+                    create_or_append(this.buffer, l);
+                }
+                (Some(l), Some(r)) if r.first() < l.first() => {
+                    let (r, r_pending) = r.split_lt(l.first(), this.shape);
+                    *this.pending_right = Some(r_pending);
+                    create_or_append(this.buffer, r);
+                }
+                (Some(l), Some(r)) => {
+                    assert_eq!(l.first(), r.first());
+                    let first = Coords::from_iter(vec![l.first()], l.ndim());
+                    create_or_append(this.buffer, first);
+
+                    if l.len() > 1 {
+                        let (_, l) = l.split(1);
+                        *this.pending_left = Some(l);
+                    } else {
+                        *this.pending_left = None;
+                    }
+
+                    if r.len() > 1 {
+                        let (_, r) = r.split(1);
+                        *this.pending_right = Some(r);
+                    } else {
+                        *this.pending_right = None;
+                    }
+                }
+                (Some(_), None) => {
+                    let mut new_l = None;
+                    mem::swap(this.pending_left, &mut new_l);
+                    create_or_append(this.buffer, new_l.unwrap());
+                }
+                (_, Some(_)) => {
+                    let mut new_r = None;
+                    mem::swap(this.pending_right, &mut new_r);
+                    create_or_append(this.buffer, new_r.unwrap());
+                }
+                (None, None) if this.buffer.is_some() => {
+                    let coords = this.buffer.as_ref().unwrap().sorted();
+                    *this.buffer = None;
+                    break Some(Ok(coords));
+                }
+                (None, None) => break None,
+            }
+
+            if let Some(buffer) = this.buffer {
+                if buffer.len() == *this.block_size {
+                    let mut coords = None;
+                    mem::swap(&mut coords, this.buffer);
+                    break Some(Ok(coords.unwrap().sorted()));
+                } else if buffer.len() > *this.block_size {
+                    let coords = buffer.sorted();
+                    let (coords, buffer) = coords.split(*this.block_size);
+                    *this.buffer = Some(buffer);
+                    break Some(Ok(coords));
+                }
+            }
+        })
+    }
+}
+
+fn create_or_append(coords: &mut Option<Coords>, to_append: Coords) {
+    *coords = match coords {
+        Some(coords) => Some(coords.append(&to_append)),
+        None if to_append.is_empty() => None,
+        None => Some(to_append),
+    };
+}
+
+#[inline]
+pub fn coord_to_offset(coord: &[u64], coord_bounds: &[u64]) -> u64 {
+    coord_bounds
+        .iter()
+        .zip(coord.iter())
+        .map(|(d, x)| d * x)
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -383,6 +632,23 @@ mod tests {
             coords.into_vec(),
             vec![vec![0, 0], vec![0, 1], vec![1, 0], vec![1, 1], vec![2, 0],]
         )
+    }
+
+    #[test]
+    fn tests_for_merge_coord_blocks() {
+        let coord_vec = vec![vec![0, 0, 0], vec![0, 0, 1], vec![0, 1, 0], vec![1, 0, 0]];
+        let coords = Coords::from_iter(coord_vec.to_vec(), 3);
+
+        assert_eq!(coords.first(), coord_vec[0]);
+        assert_eq!(&coords.last(), coord_vec.last().unwrap());
+
+        let (l, r) = coords.split(1);
+        assert_eq!(l.to_vec(), &coord_vec[..1]);
+        assert_eq!(r.to_vec(), &coord_vec[1..]);
+
+        let (l, r) = coords.split_lt(vec![0, 1, 0], &[2, 2, 2]);
+        assert_eq!(l.to_vec(), &coord_vec[..2]);
+        assert_eq!(r.to_vec(), &coord_vec[2..]);
     }
 
     #[test]
