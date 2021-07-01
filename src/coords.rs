@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::iter::IntoIterator;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -140,7 +141,7 @@ impl Coords {
     }
 
     /// Return a copy of these `Coords` without the specified axis.
-    pub fn contract(&self, axis: usize) -> Self {
+    pub fn contract_dim(&self, axis: usize) -> Self {
         let mut index: Vec<u64> = (0..self.ndim as u64).collect();
         index.remove(axis);
         let index = af::Array::new(&index, dim4(index.len()));
@@ -198,7 +199,6 @@ impl Coords {
         indexer.set_index(&seq4gen, 1, Some(true));
         let unbroadcasted = self.get(indexer);
 
-
         let axes: Vec<u64> = broadcast
             .iter()
             .enumerate()
@@ -212,6 +212,49 @@ impl Coords {
         coords.set(&indexer, unbroadcasted);
 
         coords
+    }
+
+    /// Transform the coordinate basis of these `Coords` from a slice to a source tensor.
+    ///
+    /// Panics: if `source_shape.len() - self.ndim()` does not match `elided.len()`
+    pub fn unslice(
+        &self,
+        source_shape: &[u64],
+        elided: &HashMap<usize, u64>,
+        offset: &HashMap<usize, u64>,
+    ) -> Self {
+        let ndim = source_shape.len();
+        let mut axes = Vec::with_capacity(self.ndim);
+        let mut unsliced = vec![0; source_shape.len()];
+        let mut offsets = vec![0; source_shape.len()];
+        for x in 0..ndim {
+            if let Some(elide) = elided.get(&x) {
+                unsliced[x] = *elide;
+            } else {
+                axes.push(x as u64);
+                offsets[x] = *offset.get(&x).unwrap_or(&0);
+            }
+        }
+        assert_eq!(axes.len(), self.ndim);
+
+        let axes = af::Array::new(&axes, dim4(axes.len()));
+        let seq4gen = af::Seq::new(0., (self.len() - 1) as f64, 1.);
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&axes, 0, None);
+        indexer.set_index(&seq4gen, 1, Some(true));
+
+        let unsliced = af::Array::new(&unsliced, dim4(ndim));
+        let dims = af::Dim4::new(&[1, self.len() as u64, 1, 1]);
+        let mut unsliced = af::tile(&unsliced, dims);
+        af::assign_gen(&mut unsliced, &indexer, self.af());
+
+        let offsets = af::Array::new(&offsets, dim4(ndim));
+        let offsets = af::tile(&offsets, af::Dim4::new(&[1, self.len() as u64, 1, 1]));
+
+        Self {
+            array: unsliced + offsets,
+            ndim,
+        }
     }
 
     /// Construct a new `Coords` from the selected indices.
