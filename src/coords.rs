@@ -209,6 +209,12 @@ impl Coords {
         }
     }
 
+    fn unique(&self, shape: &[u64]) -> Self {
+        let offsets = self.to_offsets(shape);
+        let offsets = af::set_unique(offsets.af(), true);
+        Self::from_offsets(offsets.into(), shape)
+    }
+
     /// Return a copy of these `Coords` without the specified axis.
     ///
     /// Panics: if there is no dimension at `axis`
@@ -602,6 +608,67 @@ where
     }
 }
 
+/// Return only the unique coordinates from a sorted stream of `Coords`.
+///
+/// Behavior is undefined if the input stream is not sorted.
+#[pin_project]
+pub struct CoordUnique<S> {
+    #[pin]
+    source: Fuse<S>,
+    buffer: Option<Coords>,
+    shape: Vec<u64>,
+    block_size: usize,
+}
+
+impl<S: Stream> CoordUnique<S> {
+    /// Construct a new `CoordUnique` stream from a sorted stream of `Coords`.
+    pub fn new(source: S, shape: Vec<u64>, block_size: usize) -> Self {
+        Self {
+            source: source.fuse(),
+            buffer: None,
+            shape,
+            block_size,
+        }
+    }
+}
+
+impl<E, S: Stream<Item = Result<Coords, E>>> Stream for CoordUnique<S> {
+    type Item = Result<Coords, E>;
+
+    fn poll_next(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        Poll::Ready(loop {
+            match ready!(this.source.as_mut().poll_next(cxt)) {
+                Some(Ok(block)) => {
+                    let buffer = if let Some(buffer) = this.buffer {
+                        buffer.append(&block).unique(this.shape)
+                    } else {
+                        block.unique(this.shape)
+                    };
+
+                    *this.buffer = Some(buffer);
+                }
+                Some(Err(cause)) => break Some(Err(cause)),
+                None if this.buffer.is_some() => {
+                    let mut buffer = None;
+                    mem::swap(this.buffer, &mut buffer);
+                    break buffer.map(Ok);
+                }
+                None => break None,
+            }
+
+            if let Some(buffer) = this.buffer {
+                if buffer.len() > *this.block_size {
+                    let (block, buffer) = buffer.split(*this.block_size);
+                    *this.buffer = Some(buffer);
+                    break Some(Ok(block));
+                }
+            }
+        })
+    }
+}
+
 #[inline]
 fn create_or_append(coords: &mut Option<Coords>, to_append: Coords) {
     *coords = match coords {
@@ -670,6 +737,21 @@ mod tests {
         assert_eq!(r.to_vec(), &coord_vec[2..]);
 
         assert_eq!(coords.to_vec(), coords.sorted().to_vec());
+    }
+
+    #[test]
+    fn test_unique_helpers() {
+        let coord_vec = vec![
+            vec![0, 0, 0],
+            vec![0, 0, 1],
+            vec![0, 0, 1],
+            vec![0, 1, 0],
+            vec![1, 0, 0],
+        ];
+        let coords = Coords::from_iter(coord_vec.to_vec(), 3);
+
+        let expected = vec![vec![0, 0, 0], vec![0, 0, 1], vec![0, 1, 0], vec![1, 0, 0]];
+        assert_eq!(coords.unique(&[2, 2, 2]).to_vec(), expected);
     }
 
     #[test]
