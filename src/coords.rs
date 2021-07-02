@@ -147,15 +147,6 @@ impl Coords {
         self.ndim
     }
 
-    fn first(&self) -> Coord {
-        let dim0 = af::Seq::new(0., (self.ndim - 1) as f32, 1.);
-        let dim1 = af::Seq::new(0., 0., 1.);
-        let slice = af::index(self.af(), &[dim0, dim1]);
-        let mut first = vec![0; self.ndim];
-        slice.host(&mut first);
-        first
-    }
-
     fn last(&self) -> Coord {
         let i = (self.len() - 1) as f32;
         let dim0 = af::Seq::new(0., (self.ndim - 1) as f32, 1.);
@@ -197,12 +188,12 @@ impl Coords {
         )
     }
 
-    fn split_lt(&self, lt: Coord, shape: &[u64]) -> (Self, Self) {
+    fn split_lt(&self, lt: &[u64], shape: &[u64]) -> (Self, Self) {
         assert_eq!(lt.len(), self.ndim);
         assert_eq!(shape.len(), self.ndim);
 
         let coord_bounds = coord_bounds(shape);
-        let pivot = coord_to_offset(&lt, &coord_bounds);
+        let pivot = coord_to_offset(lt, &coord_bounds);
         let pivot = af::Array::new(&[pivot], dim4(1));
         let offsets = self.to_offsets(shape);
         let left = af::lt(offsets.af(), &pivot, true);
@@ -211,7 +202,7 @@ impl Coords {
     }
 
     fn sorted(&self) -> Self {
-        let array = af::sort(self.af(), 1, true);
+        let array = af::sort(self.af(), 2, true);
         Self {
             array,
             ndim: self.ndim,
@@ -461,10 +452,10 @@ impl<E, S: Stream<Item = Result<Coord, E>> + Unpin> FusedStream for CoordBlocks<
 #[pin_project]
 pub struct CoordMerge<L, R> {
     #[pin]
-    left: CoordBlocks<L>,
+    left: Fuse<L>,
 
     #[pin]
-    right: CoordBlocks<R>,
+    right: Fuse<R>,
 
     pending_left: Option<Coords>,
     pending_right: Option<Coords>,
@@ -473,24 +464,17 @@ pub struct CoordMerge<L, R> {
     shape: Vec<u64>,
 }
 
-impl<L, R> CoordMerge<L, R> {
+impl<L: Stream, R: Stream> CoordMerge<L, R> {
     /// Construct a new `CoordMerge` stream.
     ///
     /// Panics: if the dimensions of `left`, `right`, and `shape` do not match,
     /// or if block_size is zero.
-    pub fn new(
-        left: CoordBlocks<L>,
-        right: CoordBlocks<R>,
-        shape: Vec<u64>,
-        block_size: usize,
-    ) -> Self {
+    pub fn new(left: L, right: R, shape: Vec<u64>, block_size: usize) -> Self {
         assert!(block_size > 0);
-        assert_eq!(left.ndim, right.ndim);
-        assert_eq!(left.ndim, shape.len());
 
         Self {
-            left,
-            right,
+            left: left.fuse(),
+            right: right.fuse(),
 
             shape,
             block_size,
@@ -504,70 +488,66 @@ impl<L, R> CoordMerge<L, R> {
 
 impl<E, L, R> Stream for CoordMerge<L, R>
 where
-    L: Stream<Item = Result<Coord, E>> + Unpin,
-    R: Stream<Item = Result<Coord, E>> + Unpin,
+    L: Stream<Item = Result<Coords, E>> + Unpin,
+    R: Stream<Item = Result<Coords, E>> + Unpin,
 {
     type Item = Result<Coords, E>;
 
     fn poll_next(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = self.project();
-
-        if this.pending_left.is_none() && !this.left.is_terminated() {
-            match ready!(this.left.poll_next(cxt)) {
-                Some(Ok(coords)) => *this.pending_left = Some(coords),
-                Some(Err(cause)) => return Poll::Ready(Some(Err(cause))),
-                None => {}
-            }
-        }
-
-        if this.pending_right.is_none() && !this.right.is_terminated() {
-            match ready!(this.right.poll_next(cxt)) {
-                Some(Ok(coords)) => *this.pending_right = Some(coords),
-                Some(Err(cause)) => return Poll::Ready(Some(Err(cause))),
-                None => {}
-            }
-        }
+        let mut this = self.project();
 
         Poll::Ready(loop {
+            if this.pending_left.is_none() && !this.left.is_terminated() {
+                match ready!(this.left.as_mut().poll_next(cxt)) {
+                    Some(Ok(coords)) => {
+                        assert_eq!(coords.ndim(), this.shape.len());
+                        *this.pending_left = Some(coords)
+                    }
+                    Some(Err(cause)) => return Poll::Ready(Some(Err(cause))),
+                    None => {}
+                }
+            }
+
+            if this.pending_right.is_none() && !this.right.is_terminated() {
+                match ready!(this.right.as_mut().poll_next(cxt)) {
+                    Some(Ok(coords)) => {
+                        assert_eq!(coords.ndim(), this.shape.len());
+                        *this.pending_right = Some(coords)
+                    }
+                    Some(Err(cause)) => return Poll::Ready(Some(Err(cause))),
+                    None => {}
+                }
+            }
+
             match (&mut *this.pending_left, &mut *this.pending_right) {
-                (Some(l), Some(r)) if l.last() < r.first() => {
+                (Some(l), Some(r)) if l.last() < r.last() => {
+                    let (r, r_pending) = r.split_lt(&l.last(), this.shape);
+                    *this.pending_right = Some(r_pending);
+                    create_or_append(this.buffer, r);
+
                     let mut l = None;
                     mem::swap(this.pending_left, &mut l);
                     create_or_append(this.buffer, l.unwrap());
                 }
-                (Some(l), Some(r)) if r.last() < l.first() => {
+                (Some(l), Some(r)) if r.last() < l.last() => {
+                    let (l, l_pending) = l.split_lt(&r.last(), this.shape);
+                    *this.pending_left = Some(l_pending);
+                    create_or_append(this.buffer, l);
+
                     let mut r = None;
                     mem::swap(this.pending_right, &mut r);
                     create_or_append(this.buffer, r.unwrap());
                 }
-                (Some(l), Some(r)) if l.first() < r.first() => {
-                    let (l, l_pending) = l.split_lt(r.first(), this.shape);
-                    *this.pending_left = Some(l_pending);
-                    create_or_append(this.buffer, l);
-                }
-                (Some(l), Some(r)) if r.first() < l.first() => {
-                    let (r, r_pending) = r.split_lt(l.first(), this.shape);
-                    *this.pending_right = Some(r_pending);
-                    create_or_append(this.buffer, r);
-                }
                 (Some(l), Some(r)) => {
-                    assert_eq!(l.first(), r.first());
-                    let first = Coords::from_iter(vec![l.first()], l.ndim());
-                    create_or_append(this.buffer, first);
+                    assert_eq!(l.last(), r.last());
 
-                    if l.len() > 1 {
-                        let (_, l) = l.split(1);
-                        *this.pending_left = Some(l);
-                    } else {
-                        *this.pending_left = None;
-                    }
+                    let mut l = None;
+                    mem::swap(this.pending_left, &mut l);
+                    create_or_append(this.buffer, l.unwrap());
 
-                    if r.len() > 1 {
-                        let (_, r) = r.split(1);
-                        *this.pending_right = Some(r);
-                    } else {
-                        *this.pending_right = None;
-                    }
+                    let mut r = None;
+                    mem::swap(this.pending_left, &mut r);
+                    create_or_append(this.buffer, r.unwrap());
                 }
                 (Some(_), None) => {
                     let mut new_l = None;
@@ -603,6 +583,7 @@ where
     }
 }
 
+#[inline]
 fn create_or_append(coords: &mut Option<Coords>, to_append: Coords) {
     *coords = match coords {
         Some(coords) => Some(coords.append(&to_append)),
@@ -635,20 +616,21 @@ mod tests {
     }
 
     #[test]
-    fn tests_for_merge_coord_blocks() {
+    fn test_merge_helpers() {
         let coord_vec = vec![vec![0, 0, 0], vec![0, 0, 1], vec![0, 1, 0], vec![1, 0, 0]];
         let coords = Coords::from_iter(coord_vec.to_vec(), 3);
 
-        assert_eq!(coords.first(), coord_vec[0]);
         assert_eq!(&coords.last(), coord_vec.last().unwrap());
 
         let (l, r) = coords.split(1);
         assert_eq!(l.to_vec(), &coord_vec[..1]);
         assert_eq!(r.to_vec(), &coord_vec[1..]);
 
-        let (l, r) = coords.split_lt(vec![0, 1, 0], &[2, 2, 2]);
+        let (l, r) = coords.split_lt(&[0, 1, 0], &[2, 2, 2]);
         assert_eq!(l.to_vec(), &coord_vec[..2]);
         assert_eq!(r.to_vec(), &coord_vec[2..]);
+
+        assert_eq!(coords.to_vec(), coords.sorted().to_vec());
     }
 
     #[test]
