@@ -56,7 +56,23 @@ impl Array {
     pub fn concatenate(left: &Array, right: &Array) -> Result<Array> {
         use Array::*;
         match (left, right) {
-            (U64(l), U64(r)) => Ok(U64(ArrayExt::concatenate(&l, &r))),
+            (Bool(l), Bool(r)) => Ok(Bool(ArrayExt::concatenate(l, r))),
+
+            (F32(l), F32(r)) => Ok(F32(ArrayExt::concatenate(l, r))),
+            (F64(l), F64(r)) => Ok(F64(ArrayExt::concatenate(l, r))),
+
+            (C32(l), C32(r)) => Ok(C32(ArrayExt::concatenate(l, r))),
+            (C64(l), C64(r)) => Ok(C64(ArrayExt::concatenate(l, r))),
+
+            (I16(l), I16(r)) => Ok(I16(ArrayExt::concatenate(l, r))),
+            (I32(l), I32(r)) => Ok(I32(ArrayExt::concatenate(l, r))),
+            (I64(l), I64(r)) => Ok(I64(ArrayExt::concatenate(l, r))),
+
+            (U8(l), U8(r)) => Ok(U8(ArrayExt::concatenate(l, r))),
+            (U16(l), U16(r)) => Ok(U16(ArrayExt::concatenate(l, r))),
+            (U32(l), U32(r)) => Ok(U32(ArrayExt::concatenate(l, r))),
+            (U64(l), U64(r)) => Ok(U64(ArrayExt::concatenate(l, r))),
+
             (l, r) => Err(error(format!(
                 "Cannot concatenate arrays with different data types: {}, {}",
                 l.dtype(),
@@ -548,6 +564,41 @@ impl Array {
         }
 
         Ok(())
+    }
+
+    /// Return a slice of this `Array`.
+    pub fn slice(&self, start: usize, end: usize) -> Result<Self> {
+        if start > self.len() {
+            return Err(error(format!(
+                "invalid start index for array slice: {}",
+                start
+            )));
+        }
+
+        if end > self.len() {
+            return Err(error(format!(
+                "invalid start index for array slice: {}",
+                end
+            )));
+        }
+
+        use Array::*;
+        let slice = match self {
+            Bool(b) => b.slice(start, end).into(),
+            C32(c) => c.slice(start, end).into(),
+            C64(c) => c.slice(start, end).into(),
+            F32(f) => f.slice(start, end).into(),
+            F64(f) => f.slice(start, end).into(),
+            I16(i) => i.slice(start, end).into(),
+            I32(i) => i.slice(start, end).into(),
+            I64(i) => i.slice(start, end).into(),
+            U8(u) => u.slice(start, end).into(),
+            U16(u) => u.slice(start, end).into(),
+            U32(u) => u.slice(start, end).into(),
+            U64(u) => u.slice(start, end).into(),
+        };
+
+        Ok(slice)
     }
 
     /// Sort this `Array` in-place.

@@ -132,9 +132,14 @@ impl Coords {
         &mut self.array
     }
 
-    /// Returns true if the number of coordinates in these `Coords` is zero.
+    /// Return `true` if the number of coordinates in these `Coords` is zero.
     pub fn is_empty(&self) -> bool {
         self.array.elements() == 0
+    }
+
+    /// Return `true` if these `Coords` are in sorted order with respect to the given `shape`.
+    pub fn is_sorted(&self, shape: &[u64]) -> bool {
+        self.to_offsets(shape).is_sorted()
     }
 
     /// Return the number of coordinates stored in these `Coords`.

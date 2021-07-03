@@ -80,6 +80,14 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
         af::join(0, left.af(), right.af()).into()
     }
 
+    /// Return `true` if the elements of this `ArrayExt` are in sorted order.
+    pub fn is_sorted(&self) -> bool
+    where
+        T: af::RealNumber + Clone,
+    {
+        af::all_true_all(&af::eq(self.af(), self.sorted(true).af(), false)).0
+    }
+
     /// Cast the values of this `ArrayExt` into a destination type `D`.
     pub fn type_cast<D: af::HasAfEnum>(&self) -> ArrayExt<D> {
         ArrayExt(self.af_cast())
@@ -109,13 +117,32 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
         self.0
     }
 
+    /// Return a slice of this `ArrayExt`.
+    ///
+    /// Panics: if `end` is out of bounds
+    pub fn slice(&self, start: usize, end: usize) -> Self {
+        af::index(
+            self.af(),
+            &[af::Seq::new(start as f32, (end - 1) as f32, 1.)],
+        )
+        .into()
+    }
+
     /// Sort this `ArrayExt`.
     pub fn sort(&mut self, ascending: bool)
     where
         T: af::RealNumber,
     {
+        *self = self.sorted(ascending)
+    }
+
+    /// Return a sorted copy of this `ArrayExt`.
+    pub fn sorted(&self, ascending: bool) -> Self
+    where
+        T: af::RealNumber,
+    {
         debug_assert_eq!(self.0.dims(), dim4(self.len()));
-        *self = Self(af::sort(&self.0, 0, ascending))
+        Self(af::sort(&self.0, 0, ascending))
     }
 
     /// Split this `ArrayExt<T>` into two new instances at the given pivot.
@@ -126,6 +153,16 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
             ArrayExt(af::index(self.af(), &[left, af::Seq::default()])),
             ArrayExt(af::index(self.af(), &[right, af::Seq::default()])),
         )
+    }
+
+    /// Return only the unique values from this `ArrayExt`.
+    ///
+    /// Pass `true` for `sorted` if this `ArrayExt` is known to be in sorted order.
+    pub fn unique(&self, sorted: bool) -> Self
+    where
+        T: af::RealNumber,
+    {
+        Self(af::set_unique(self.af(), sorted))
     }
 
     fn into_stream<E>(self) -> impl Stream<Item = Result<Vec<T>, E>>
@@ -209,10 +246,12 @@ impl ArrayExt<u64> {
 impl<T: af::HasAfEnum> ArrayInstance for ArrayExt<T> {
     type DType = T;
 
+    #[inline]
     fn af(&'_ self) -> &'_ af::Array<T> {
         &self.0
     }
 
+    #[inline]
     fn af_mut(&mut self) -> &mut af::Array<Self::DType> {
         &mut self.0
     }
