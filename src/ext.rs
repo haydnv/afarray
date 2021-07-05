@@ -165,18 +165,18 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
         Self(af::set_unique(self.af(), sorted))
     }
 
-    fn into_stream<E>(self) -> impl Stream<Item = Result<Vec<T>, E>>
+    fn into_stream(self) -> impl Stream<Item = Vec<T>>
     where
         T: Clone,
     {
-        stream::once(future::ready(Ok(self.to_vec())))
+        stream::once(future::ready(self.to_vec()))
     }
 
-    fn to_stream<E>(&self) -> impl Stream<Item = Result<Vec<T>, E>>
+    fn to_stream(&self) -> impl Stream<Item = Vec<T>>
     where
         T: Clone,
     {
-        stream::once(future::ready(Ok(self.to_vec())))
+        stream::once(future::ready(self.to_vec()))
     }
 }
 
