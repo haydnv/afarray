@@ -580,7 +580,7 @@ where
                     create_or_append(this.buffer, l.unwrap());
 
                     let mut r = None;
-                    mem::swap(this.pending_left, &mut r);
+                    mem::swap(this.pending_right, &mut r);
                     create_or_append(this.buffer, r.unwrap());
                 }
                 (Some(_), None) => {
