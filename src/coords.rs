@@ -243,10 +243,10 @@ impl Coords {
         assert!(axis <= self.ndim);
 
         let ndim = self.ndim + 1;
-        let dims = af::Dim4::new(&[ndim as u64, 1, 1, 1]);
-        let mut expanded = af::Array::new(&vec![0; ndim], dims);
+        let dims = af::Dim4::new(&[ndim as u64, self.len() as u64, 1, 1]);
+        let mut expanded = af::Array::new(&vec![0; ndim * self.len()], dims);
 
-        let index: Vec<u64> = (0..ndim)
+        let index: Vec<u64> = (0..self.ndim())
             .map(|x| if x < axis { x } else { x + 1 })
             .map(|x| x as u64)
             .collect();
@@ -423,7 +423,11 @@ pub struct CoordBlocks<S> {
 
 impl<E, S: Stream<Item = Result<Coord, E>>> CoordBlocks<S> {
     /// Construct a new `CoordBlocks`.
+    ///
+    /// Panics: if `ndim == 0`
     pub fn new(source: S, ndim: usize, block_size: usize) -> Self {
+        assert!(ndim > 0);
+
         Self {
             source: source.fuse(),
             ndim,
