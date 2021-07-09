@@ -156,7 +156,7 @@ impl Coords {
 
     /// Return the number of coordinates stored in these `Coords`.
     pub fn len(&self) -> usize {
-        self.array.elements() as usize / self.ndim
+        self.af().dims()[1] as usize
     }
 
     /// Return the number of dimensions of these `Coords`.
@@ -251,15 +251,15 @@ impl Coords {
         assert!(axis <= self.ndim);
 
         let ndim = self.ndim + 1;
-        let dims = af::Dim4::new(&[ndim as u64, self.len() as u64, 1, 1]);
-        let mut expanded = af::Array::new(&vec![0; ndim * self.len()], dims);
+        let dims = af::Dim4::new(&[ndim as u64, self.af().dims()[1], 1, 1]);
+        let mut expanded = af::constant(0, dims);
 
         let index: Vec<u64> = (0..self.ndim())
             .map(|x| if x < axis { x } else { x + 1 })
             .map(|x| x as u64)
             .collect();
 
-        index_set(&mut expanded, self.len(), &index, self.af());
+        index_set(&mut expanded, &index, self.af());
 
         Self {
             array: expanded,
@@ -337,7 +337,7 @@ impl Coords {
         let unsliced = af::Array::new(&unsliced, dim4(ndim));
         let tile_dims = af::Dim4::new(&[1, self.len() as u64, 1, 1]);
         let mut unsliced = af::tile(&unsliced, tile_dims);
-        index_set(&mut unsliced, self.len(), &axes, self.af());
+        index_set(&mut unsliced, &axes, self.af());
 
         let offsets = af::Array::new(&offsets, dim4(ndim));
         let offsets = af::tile(&offsets, tile_dims);
@@ -379,8 +379,7 @@ impl Coords {
             })
             .collect();
 
-        let len = self.len();
-        index_set(self.af_mut(), len, &axes, value.af())
+        index_set(self.af_mut(), &axes, value.af())
     }
 
     /// Return these `Coords` as [`Offsets`] with respect to the given shape.
@@ -715,14 +714,24 @@ fn index_get(subject: &af::Array<u64>, index: &[u64]) -> af::Array<u64> {
     af::index_gen(subject, indexer)
 }
 
-fn index_set(subject: &mut af::Array<u64>, len: usize, index: &[u64], value: &af::Array<u64>) {
-    let index = af::Array::new(index, dim4(index.len()));
-    let seq4gen = af::Seq::new(0., (len - 1) as f32, 1.);
-    let mut indexer = af::Indexer::default();
-    indexer.set_index(&index, 0, None);
-    indexer.set_index(&seq4gen, 1, Some(true));
+fn index_set(subject: &mut af::Array<u64>, index: &[u64], value: &af::Array<u64>) {
+    debug_assert!(value.dims()[0] == index.len() as u64);
+    debug_assert!(value.dims()[1] == subject.dims()[1]);
 
-    af::assign_gen(subject, &indexer, value);
+    let len = subject.dims()[1];
+    let index = af::Array::new(index, dim4(index.len()));
+    if len == 1 {
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&index, 0, Some(false));
+        af::assign_gen(subject, &indexer, value);
+    } else {
+        let seq4gen = af::Seq::new(0., (len - 1) as f32, 1.);
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&index, 0, None);
+        indexer.set_index(&seq4gen, 1, Some(true));
+
+        af::assign_gen(subject, &indexer, value);
+    }
 }
 
 #[cfg(test)]
