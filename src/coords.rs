@@ -26,7 +26,11 @@ pub struct Coords {
 
 impl Coords {
     /// Constructs `Coords` with the given `size` full of zeros (origin points) for the given shape.
+    ///
+    /// Panics: if shape is empty
     pub fn empty(shape: &[u64], size: usize) -> Self {
+        assert!(!shape.is_empty());
+
         let ndim = shape.len();
         let dims = af::Dim4::new(&[ndim as u64, size as u64, 1, 1]);
         let array = af::constant(0u64, dims);
@@ -35,8 +39,10 @@ impl Coords {
 
     /// Constructs a new `Coords` from an iterator of [`Coord`]s.
     ///
-    /// Panics: if any [`Coord`] is not of length `ndim`.
+    /// Panics: if any [`Coord`] is not of length `ndim`, or if `ndim` is zero.
     pub fn from_iter<I: IntoIterator<Item = Coord>>(iter: I, ndim: usize) -> Self {
+        assert!(ndim > 0);
+
         let buffer: Vec<u64> = iter
             .into_iter()
             .inspect(|coord| assert_eq!(coord.len(), ndim))
@@ -50,7 +56,11 @@ impl Coords {
     }
 
     /// Constructs a new `Coords` from an [`ArrayExt`] of offsets with respect to the given shape.
+    ///
+    /// Panics: if `shape` is empty
     pub fn from_offsets(offsets: Offsets, shape: &[u64]) -> Self {
+        assert!(!shape.is_empty());
+
         let ndim = shape.len() as u64;
         let coord_bounds = coord_bounds(shape);
 
@@ -70,12 +80,14 @@ impl Coords {
 
     /// Constructs a new `Coords` from a [`Stream`] of [`Coord`]s.
     ///
-    /// Panics: if any [`Coord`] has a length other than `ndim`
+    /// Panics: if any [`Coord`] has a length other than `ndim`, or if `ndim` is zero
     pub async fn from_stream<S: Stream<Item = Coord> + Unpin>(
         mut source: S,
         ndim: usize,
         size_hint: Option<usize>,
     ) -> Self {
+        assert!(ndim > 0);
+
         let mut num_coords = 0;
         let mut buffer = if let Some(size) = size_hint {
             Vec::with_capacity(size)
@@ -165,7 +177,7 @@ impl Coords {
     fn append(&self, other: &Coords) -> Self {
         assert_eq!(self.ndim, other.ndim);
 
-        let array = af::join(0, self.af(), other.af());
+        let array = af::join(1, self.af(), other.af());
         Self {
             array,
             ndim: self.ndim,
@@ -226,14 +238,10 @@ impl Coords {
     pub fn contract_dim(&self, axis: usize) -> Self {
         assert!(axis < self.ndim);
 
-        let mut index: Vec<u64> = (0..self.ndim as u64).collect();
+        let mut index: Vec<usize> = (0..self.ndim).collect();
         index.remove(axis);
 
-        let array = index_get(self.af(), self.len(), &index);
-        Self {
-            array,
-            ndim: self.ndim - 1,
-        }
+        self.get(&index)
     }
 
     /// Return a copy of these `Coords` with a new dimension at the given axis.
@@ -352,7 +360,7 @@ impl Coords {
             })
             .collect();
 
-        let array = index_get(self.af(), self.len(), &axes);
+        let array = index_get(self.af(), &axes);
         Self {
             array,
             ndim: axes.len(),
@@ -696,7 +704,8 @@ pub fn coord_to_offset(coord: &[u64], coord_bounds: &[u64]) -> u64 {
         .sum()
 }
 
-fn index_get(subject: &af::Array<u64>, len: usize, index: &[u64]) -> af::Array<u64> {
+fn index_get(subject: &af::Array<u64>, index: &[u64]) -> af::Array<u64> {
+    let len = subject.dims()[1];
     let index = af::Array::new(index, dim4(index.len()));
     let seq4gen = af::Seq::new(0., (len - 1) as f32, 1.);
     let mut indexer = af::Indexer::default();
@@ -732,7 +741,13 @@ mod tests {
 
     #[test]
     fn test_merge_helpers() {
-        let coord_vec = vec![vec![0, 0, 0], vec![0, 0, 1], vec![0, 1, 0], vec![1, 0, 0]];
+        let coord_vec = vec![
+            vec![0, 0, 0],
+            vec![0, 0, 1],
+            vec![0, 1, 0],
+            vec![1, 0, 0],
+            vec![1, 1, 1],
+        ];
         let coords = Coords::from_iter(coord_vec.to_vec(), 3);
 
         assert_eq!(&coords.last(), coord_vec.last().unwrap());
@@ -744,6 +759,9 @@ mod tests {
         let (l, r) = coords.split_lt(&[0, 1, 0], &[2, 2, 2]);
         assert_eq!(l.to_vec(), &coord_vec[..2]);
         assert_eq!(r.to_vec(), &coord_vec[2..]);
+
+        let joined = l.append(&r);
+        assert_eq!(joined.to_vec(), coords.to_vec());
 
         assert_eq!(coords.to_vec(), coords.sorted().to_vec());
     }
