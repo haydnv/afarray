@@ -267,6 +267,31 @@ impl Coords {
         }
     }
 
+    /// Transform the coordinate basis of these `Coords` from a source tensor to a slice.
+    pub fn slice(
+        &self,
+        shape: &[u64],
+        elided: &HashMap<usize, u64>,
+        offset: &HashMap<usize, u64>,
+    ) -> Self {
+        let ndim = shape.len();
+        let mut offsets = Vec::with_capacity(ndim);
+        let mut index = Vec::with_capacity(ndim);
+        for x in 0..self.ndim {
+            if elided.contains_key(&x) {
+                continue;
+            }
+
+            let offset = offset.get(&x).unwrap_or(&0);
+            offsets.push(*offset);
+            index.push(x);
+        }
+
+        let offsets = af::Array::new(&offsets, dim4(offsets.len()));
+        let array = af::sub(self.get(&index).af(), &offsets, true);
+        Self { array, ndim }
+    }
+
     /// Transpose these `Coords` according to the given `permutation`.
     ///
     /// If no permutation is given, the coordinate axes will be inverted.
