@@ -307,6 +307,44 @@ impl Array {
         }
     }
 
+    /// Element-wise check for infinite values.
+    pub fn is_infinite(&self) -> Array {
+        use Array::*;
+        match self {
+            Bool(b) => b.is_infinite().into(),
+            C32(c) => c.is_infinite().into(),
+            C64(c) => c.is_infinite().into(),
+            F32(f) => f.is_infinite().into(),
+            F64(f) => f.is_infinite().into(),
+            I16(i) => i.is_infinite().into(),
+            I32(i) => i.is_infinite().into(),
+            I64(i) => i.is_infinite().into(),
+            U8(u) => u.is_infinite().into(),
+            U16(u) => u.is_infinite().into(),
+            U32(u) => u.is_infinite().into(),
+            U64(u) => u.is_infinite().into(),
+        }
+    }
+
+    /// Element-wise check for non-numeric (NaN) values.
+    pub fn is_nan(&self) -> Array {
+        use Array::*;
+        match self {
+            Bool(b) => b.is_nan().into(),
+            C32(c) => c.is_nan().into(),
+            C64(c) => c.is_nan().into(),
+            F32(f) => f.is_nan().into(),
+            F64(f) => f.is_nan().into(),
+            I16(i) => i.is_nan().into(),
+            I32(i) => i.is_nan().into(),
+            I64(i) => i.is_nan().into(),
+            U8(u) => u.is_nan().into(),
+            U16(u) => u.is_nan().into(),
+            U32(u) => u.is_nan().into(),
+            U64(u) => u.is_nan().into(),
+        }
+    }
+
     /// Element-wise less-than comparison.
     pub fn lt(&self, other: &Array) -> Array {
         use Array::*;

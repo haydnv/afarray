@@ -576,6 +576,12 @@ impl ArrayInstanceAnyAll for ArrayExt<Complex<f64>> {
 
 /// Defines element-wise comparison operations.
 pub trait ArrayInstanceCompare {
+    /// Element-wise check for infinite values.
+    fn is_infinite(&self) -> ArrayExt<bool>;
+
+    /// Element-wise check for non-numeric (NaN) values.
+    fn is_nan(&self) -> ArrayExt<bool>;
+
     /// Element-wise equality.
     fn eq(&self, other: &Self) -> ArrayExt<bool>;
 
@@ -596,6 +602,14 @@ pub trait ArrayInstanceCompare {
 }
 
 impl<T: af::HasAfEnum + af::ImplicitPromote<T>> ArrayInstanceCompare for ArrayExt<T> {
+    fn is_infinite(&self) -> ArrayExt<bool> {
+        af::isinf(self.af()).into()
+    }
+
+    fn is_nan(&self) -> ArrayExt<bool> {
+        af::isnan(self.af()).into()
+    }
+
     fn eq(&self, other: &Self) -> ArrayExt<bool> {
         af::eq(self.af(), other.af(), BATCH).into()
     }
