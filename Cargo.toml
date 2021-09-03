@@ -1,6 +1,6 @@
 [package]
 name = "afarray"
-version = "0.7.1"
+version = "0.7.2"
 authors = ["haydn@tinychain.net"]
 edition = "2018"
 license = "Apache-2.0"
@@ -19,11 +19,11 @@ futures = "0.3"
 num-complex = "0.2"
 num-derive = "0.3"
 num-traits = "0.2"
-number-general = "~0.3.10"
+number-general = "~0.3.12"
 pin-project = "1.0"
 safecast = "0.1"
 serde = "1.0"
 
 [dev-dependencies]
 tbon = "~0.3.5"
-tokio = { version = "1.9", features=["macros", "rt"] }
+tokio = { version = "1.11", features=["macros", "rt"] }

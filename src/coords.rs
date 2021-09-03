@@ -185,8 +185,11 @@ impl Coords {
     }
 
     fn split(&self, at: usize) -> (Self, Self) {
-        assert!(at > 0);
         assert!(at < self.len());
+        if at == 0 {
+            let shape: Vec<u64> = std::iter::repeat(0).take(self.ndim()).collect();
+            return (Coords::empty(&shape, 0), self.clone());
+        }
 
         let left = af::Seq::new(0., (at - 1) as f32, 1.);
         let right = af::Seq::new(at as f32, (self.len() - 1) as f32, 1.);
