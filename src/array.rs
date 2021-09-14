@@ -520,6 +520,28 @@ impl Array {
         }
     }
 
+    /// Return this `Array` raised to the power of `other`.
+    pub fn pow(&self, other: &Self) -> Self {
+        if self.dtype() != other.dtype() {
+            let dtype = Ord::max(self.dtype(), other.dtype());
+            return self.cast_into(dtype).pow(&other.cast_into(dtype));
+        }
+
+        // af::pow only works with floating point numbers!
+        // raising an f32 af::Array to a power causes a stack overflow!
+        use Array::*;
+        match (self, other) {
+            (C64(l), C64(r)) => C64(l.pow(r)),
+            (C32(l), C32(r)) => C64(l.type_cast()).pow(&C64(r.type_cast())),
+            (F64(l), F64(r)) => F64(l.pow(r)),
+            (l, r) => {
+                let l = F64(l.type_cast());
+                let r = F64(r.type_cast());
+                l.pow(&r)
+            }
+        }
+    }
+
     /// Set the values at the specified coordinates to the corresponding values in `other`.
     pub fn set(&mut self, index: &ArrayExt<u64>, other: &Array) -> Result<()> {
         let mut indexer = af::Indexer::default();
@@ -775,7 +797,8 @@ impl Add for &Array {
         use Array::*;
         match (self, other) {
             (Bool(l), Bool(r)) => Bool(l + r),
-            (C32(l), C32(r)) => C32(l + r),
+            // Adding an F32 array causes a stack overflow
+            (C32(l), C32(r)) => &C64(l.type_cast()) + &C64(r.type_cast()),
             (C64(l), C64(r)) => C64(l + r),
             // Adding an F32 array causes a stack overflow
             (F32(l), F32(r)) => &F64(l.type_cast()) + &F64(r.type_cast()),
@@ -811,7 +834,8 @@ impl Sub for &Array {
         use Array::*;
         match (self, other) {
             (Bool(l), Bool(r)) => Bool(l - r),
-            (C32(l), C32(r)) => C32(l - r),
+            // Subtracting a 32-bit float causes a stack overflow
+            (C32(l), C32(r)) => &C64(l.type_cast()) - &C64(r.type_cast()),
             (C64(l), C64(r)) => C64(l - r),
             // Subtracting a 32-bit float causes a stack overflow
             (F32(l), F32(r)) => &F64(l.type_cast()) - &F64(r.type_cast()),
@@ -847,7 +871,8 @@ impl Mul for &Array {
         use Array::*;
         match (self, other) {
             (Bool(l), Bool(r)) => Bool(l * r),
-            (C32(l), C32(r)) => C32(l * r),
+            // Multiplying a 32-bit float causes a stack overflow
+            (C32(l), C32(r)) => &C64(l.type_cast()) * &C64(r.type_cast()),
             (C64(l), C64(r)) => C64(l * r),
             // Multiplying a 32-bit float causes a stack overflow
             (F32(l), F32(r)) => &F64(l.type_cast()) * &F64(r.type_cast()),
@@ -883,7 +908,8 @@ impl Div for &Array {
         use Array::*;
         match (self, other) {
             (Bool(l), Bool(r)) => Bool(l / r),
-            (C32(l), C32(r)) => C32(l / r),
+            // dividing an F32 array causes a stack overflow
+            (C32(l), C32(r)) => &C64(l.type_cast()) / &C64(r.type_cast()),
             (C64(l), C64(r)) => C64(l / r),
             // dividing an F32 array causes a stack overflow
             (F32(l), F32(r)) => &F64(l.type_cast()) / &F64(r.type_cast()),
@@ -1370,6 +1396,21 @@ mod tests {
 
         let b: Array = [-1., -4., 4.][..].into();
         assert_eq!(&a / &b, [-1., -0.5, 0.75][..].into());
+    }
+
+    #[test]
+    fn test_pow() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [2][..].into();
+        assert_eq!(a.pow(&b), [1.0, 4.0, 9.0][..].into());
+
+        let a: Array = [1, 2, 3][..].into();
+        let b: Array = [2.0][..].into();
+        assert_eq!(a.pow(&b), [1.0, 4.0, 9.0][..].into());
+
+        let a: Array = [1.0, 2.0, 3.0][..].into();
+        let b: Array = [2][..].into();
+        assert_eq!(a.pow(&b), [1.0, 4.0, 9.0][..].into());
     }
 
     #[test]

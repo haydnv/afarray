@@ -12,8 +12,6 @@ use serde::ser::{Serialize, Serializer};
 
 use super::{dim4, Complex};
 
-const BATCH: bool = true;
-
 /// Defines common access methods for instance of [`ArrayExt`].
 pub trait ArrayInstance {
     type DType: af::HasAfEnum;
@@ -188,19 +186,20 @@ impl ArrayExt<bool> {
 
     /// Logical and.
     pub fn and(&self, other: &Self) -> Self {
-        ArrayExt(af::and(self.af(), other.af(), BATCH))
+        ArrayExt(af::and(self.af(), other.af(), batch(self, other)))
     }
 
     /// Logical or.
     pub fn or(&self, other: &Self) -> Self {
-        ArrayExt(af::or(self.af(), other.af(), BATCH))
+        ArrayExt(af::or(self.af(), other.af(), batch(self, other)))
     }
 
     /// Logical xor.
     pub fn xor(&self, other: &Self) -> Self {
-        let one = af::or(self.af(), other.af(), BATCH);
-        let not_both = !(&af::and(self.af(), other.af(), BATCH));
-        let one_and_not_both = af::and(&one, &not_both, BATCH);
+        let batch = batch(self, other);
+        let one = af::or(self.af(), other.af(), batch);
+        let not_both = !(&af::and(self.af(), other.af(), batch));
+        let one_and_not_both = af::and(&one, &not_both, batch);
         ArrayExt(one_and_not_both)
     }
 }
@@ -266,7 +265,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> A
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn add(self, other: Self) -> Self::Output {
-        ArrayExt(af::add(&self.0, &other.0, BATCH))
+        ArrayExt(af::add(&self.0, &other.0, batch(&self, &other)))
     }
 }
 
@@ -279,7 +278,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> A
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn add(self, other: Self) -> Self::Output {
-        ArrayExt(af::add(&self.0, &other.0, BATCH))
+        ArrayExt(af::add(&self.0, &other.0, batch(self, other)))
     }
 }
 
@@ -304,7 +303,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> M
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn mul(self, other: Self) -> Self::Output {
-        ArrayExt(af::mul(&self.0, &other.0, BATCH))
+        ArrayExt(af::mul(&self.0, &other.0, batch(&self, &other)))
     }
 }
 
@@ -317,7 +316,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> M
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn mul(self, other: Self) -> Self::Output {
-        ArrayExt(af::mul(&self.0, &other.0, BATCH))
+        ArrayExt(af::mul(&self.0, &other.0, batch(self, other)))
     }
 }
 
@@ -342,7 +341,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> D
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn div(self, other: Self) -> Self::Output {
-        ArrayExt(af::div(&self.0, &other.0, BATCH))
+        ArrayExt(af::div(&self.0, &other.0, batch(&self, &other)))
     }
 }
 
@@ -355,7 +354,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> D
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn div(self, other: Self) -> Self::Output {
-        ArrayExt(af::div(&self.0, &other.0, BATCH))
+        ArrayExt(af::div(&self.0, &other.0, batch(self, other)))
     }
 }
 
@@ -368,7 +367,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> S
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn sub(self, other: Self) -> Self::Output {
-        ArrayExt(af::sub(&self.0, &other.0, BATCH))
+        ArrayExt(af::sub(&self.0, &other.0, batch(&self, &other)))
     }
 }
 
@@ -381,7 +380,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> S
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn sub(self, other: Self) -> Self::Output {
-        ArrayExt(af::sub(&self.0, &other.0, BATCH))
+        ArrayExt(af::sub(&self.0, &other.0, batch(self, other)))
     }
 }
 
@@ -406,7 +405,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> R
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn rem(self, other: Self) -> Self::Output {
-        ArrayExt(af::modulo(&self.0, &other.0, BATCH))
+        ArrayExt(af::modulo(&self.0, &other.0, batch(&self, &other)))
     }
 }
 
@@ -419,7 +418,7 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> R
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 
     fn rem(self, other: Self) -> Self::Output {
-        ArrayExt(af::modulo(&self.0, &other.0, BATCH))
+        ArrayExt(af::modulo(&self.0, &other.0, batch(self, other)))
     }
 }
 
@@ -611,27 +610,48 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T>> ArrayInstanceCompare for ArrayEx
     }
 
     fn eq(&self, other: &Self) -> ArrayExt<bool> {
-        af::eq(self.af(), other.af(), BATCH).into()
+        af::eq(self.af(), other.af(), batch(self, other)).into()
     }
 
     fn gt(&self, other: &Self) -> ArrayExt<bool> {
-        af::gt(self.af(), other.af(), BATCH).into()
+        af::gt(self.af(), other.af(), batch(self, other)).into()
     }
 
     fn gte(&self, other: &Self) -> ArrayExt<bool> {
-        af::ge(self.af(), other.af(), BATCH).into()
+        af::ge(self.af(), other.af(), batch(self, other)).into()
     }
 
     fn lt(&self, other: &Self) -> ArrayExt<bool> {
-        af::lt(self.af(), other.af(), BATCH).into()
+        af::lt(self.af(), other.af(), batch(self, other)).into()
     }
 
     fn lte(&self, other: &Self) -> ArrayExt<bool> {
-        af::le(self.af(), other.af(), BATCH).into()
+        af::le(self.af(), other.af(), batch(self, other)).into()
     }
 
     fn ne(&self, other: &Self) -> ArrayExt<bool> {
         self.eq(other).not()
+    }
+}
+
+/// Defines an exponentiation method `pow`.
+pub trait ArrayInstancePow: ArrayInstance {
+    type Pow: af::HasAfEnum;
+
+    /// Calculate the element-wise exponentiation.
+    fn pow(&self, other: &Self) -> ArrayExt<Self::Pow>;
+}
+
+impl<T> ArrayInstancePow for ArrayExt<T>
+where
+    T: af::HasAfEnum + af::ConstGenerator<OutType = T> + Clone + Default,
+    <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+    <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum,
+{
+    type Pow = <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output;
+
+    fn pow(&self, other: &Self) -> ArrayExt<Self::Pow> {
+        af::pow(self.af(), other.af(), true).into()
     }
 }
 
@@ -1272,4 +1292,9 @@ mod tests {
         let range = ArrayExt::range(1, 10);
         assert_eq!(range.to_vec(), (1..10).collect::<Vec<u64>>())
     }
+}
+
+#[inline]
+fn batch<T: af::HasAfEnum>(this: &ArrayExt<T>, that: &ArrayExt<T>) -> bool {
+    this.0.dims() != that.0.dims()
 }
