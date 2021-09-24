@@ -53,31 +53,30 @@ impl Array {
     }
 
     /// Concatenate two `Array`s.
-    pub fn concatenate(left: &Array, right: &Array) -> Result<Array> {
+    pub fn concatenate(left: &Array, right: &Array) -> Array {
         use Array::*;
         match (left, right) {
-            (Bool(l), Bool(r)) => Ok(Bool(ArrayExt::concatenate(l, r))),
+            (Bool(l), Bool(r)) => Bool(ArrayExt::concatenate(l, r)),
 
-            (F32(l), F32(r)) => Ok(F32(ArrayExt::concatenate(l, r))),
-            (F64(l), F64(r)) => Ok(F64(ArrayExt::concatenate(l, r))),
+            (F32(l), F32(r)) => F32(ArrayExt::concatenate(l, r)),
+            (F64(l), F64(r)) => F64(ArrayExt::concatenate(l, r)),
 
-            (C32(l), C32(r)) => Ok(C32(ArrayExt::concatenate(l, r))),
-            (C64(l), C64(r)) => Ok(C64(ArrayExt::concatenate(l, r))),
+            (C32(l), C32(r)) => C32(ArrayExt::concatenate(l, r)),
+            (C64(l), C64(r)) => C64(ArrayExt::concatenate(l, r)),
 
-            (I16(l), I16(r)) => Ok(I16(ArrayExt::concatenate(l, r))),
-            (I32(l), I32(r)) => Ok(I32(ArrayExt::concatenate(l, r))),
-            (I64(l), I64(r)) => Ok(I64(ArrayExt::concatenate(l, r))),
+            (I16(l), I16(r)) => I16(ArrayExt::concatenate(l, r)),
+            (I32(l), I32(r)) => I32(ArrayExt::concatenate(l, r)),
+            (I64(l), I64(r)) => I64(ArrayExt::concatenate(l, r)),
 
-            (U8(l), U8(r)) => Ok(U8(ArrayExt::concatenate(l, r))),
-            (U16(l), U16(r)) => Ok(U16(ArrayExt::concatenate(l, r))),
-            (U32(l), U32(r)) => Ok(U32(ArrayExt::concatenate(l, r))),
-            (U64(l), U64(r)) => Ok(U64(ArrayExt::concatenate(l, r))),
+            (U8(l), U8(r)) => U8(ArrayExt::concatenate(l, r)),
+            (U16(l), U16(r)) => U16(ArrayExt::concatenate(l, r)),
+            (U32(l), U32(r)) => U32(ArrayExt::concatenate(l, r)),
+            (U64(l), U64(r)) => U64(ArrayExt::concatenate(l, r)),
 
-            (l, r) => Err(error(format!(
-                "Cannot concatenate arrays with different data types: {}, {}",
-                l.dtype(),
-                r.dtype()
-            ))),
+            (l, r) if l.dtype() > r.dtype() => Array::concatenate(l, &r.cast_into(l.dtype())),
+            (l, r) if l.dtype() < r.dtype() => Array::concatenate(&l.cast_into(r.dtype()), r),
+
+            _ => unreachable!(),
         }
     }
 
