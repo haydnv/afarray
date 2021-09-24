@@ -121,7 +121,7 @@ impl Array {
             C32(_) => ComplexType::C32.into(),
             C64(_) => ComplexType::C32.into(),
             F32(_) => FloatType::F32.into(),
-            F64(_) => FloatType::F32.into(),
+            F64(_) => FloatType::F64.into(),
             I16(_) => IntType::I16.into(),
             I32(_) => IntType::I32.into(),
             I64(_) => IntType::I64.into(),
@@ -540,17 +540,10 @@ impl Array {
 
     /// Return this `Array` raised to the power of `other`.
     pub fn pow(&self, other: &Self) -> Self {
-        if self.dtype() != other.dtype() {
-            let dtype = Ord::max(self.dtype(), other.dtype());
-            return self.cast_into(dtype).pow(&other.cast_into(dtype));
-        }
-
         // af::pow only works with floating point numbers!
-        // raising an f32 af::Array to a power causes a stack overflow!
         use Array::*;
         match (self, other) {
             (C64(l), C64(r)) => C64(l.pow(r)),
-            (C32(l), C32(r)) => C64(l.type_cast()).pow(&C64(r.type_cast())),
             (F64(l), F64(r)) => F64(l.pow(r)),
             (l, r) => {
                 let l = F64(l.type_cast());
@@ -815,11 +808,9 @@ impl Add for &Array {
         use Array::*;
         match (self, other) {
             (Bool(l), Bool(r)) => Bool(l + r),
-            // Adding an F32 array causes a stack overflow
-            (C32(l), C32(r)) => &C64(l.type_cast()) + &C64(r.type_cast()),
+            (C32(l), C32(r)) => C32(l + r),
             (C64(l), C64(r)) => C64(l + r),
-            // Adding an F32 array causes a stack overflow
-            (F32(l), F32(r)) => &F64(l.type_cast()) + &F64(r.type_cast()),
+            (F32(l), F32(r)) => F32(l + r),
             (F64(l), F64(r)) => F64(l + r),
             (I16(l), I16(r)) => I16(l + r),
             (I32(l), I32(r)) => I32(l + r),
@@ -828,20 +819,58 @@ impl Add for &Array {
             (U16(l), U16(r)) => U16(l + r),
             (U32(l), U32(r)) => U32(l + r),
             (U64(l), U64(r)) => U64(l + r),
-            (l, r) => {
-                let dtype = Ord::max(l.dtype(), r.dtype());
-                let l = l.cast_into(dtype);
-                let r = r.cast_into(dtype);
-                &l + &r
-            }
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l + &r.cast_into(l_dtype),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => &l.cast_into(r_dtype) + r,
+                (l, r) => unreachable!("add {}, {}", l, r),
+            },
         }
     }
 }
 
-impl AddAssign for Array {
-    fn add_assign(&mut self, other: Self) {
-        let sum = &*self + &other;
+impl Add<Number> for &Array {
+    type Output = Array;
+
+    fn add(self, rhs: Number) -> Self::Output {
+        use number_general::Complex;
+        match (self, rhs) {
+            (Array::Bool(l), Number::Bool(r)) => Array::Bool(l + bool::from(r)),
+
+            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32(l + r),
+            (Array::F64(l), Number::Float(Float::F32(r))) => Array::F64(l + r),
+            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64(l + r),
+
+            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32(l + r),
+            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64(l + r),
+
+            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16(l + r),
+            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32(l + r),
+            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64(l + r),
+
+            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8(l + r),
+            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16(l + r),
+            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32(l + r),
+            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64(l + r),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l + r.into_type(l_dtype),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => &l.cast_into(r_dtype) + r,
+                (l, r) => unreachable!("add {}, {}", l, r),
+            },
+        }
+    }
+}
+
+impl AddAssign<&Array> for Array {
+    fn add_assign(&mut self, other: &Array) {
+        let sum = &*self + other;
         *self = sum;
+    }
+}
+
+impl AddAssign<Number> for Array {
+    fn add_assign(&mut self, rhs: Number) {
+        *self = &*self + rhs;
     }
 }
 
@@ -865,20 +894,57 @@ impl Sub for &Array {
             (U16(l), U16(r)) => U16(l - r),
             (U32(l), U32(r)) => U32(l - r),
             (U64(l), U64(r)) => U64(l - r),
-            (l, r) => {
-                let dtype = Ord::max(l.dtype(), r.dtype());
-                let l = l.cast_into(dtype);
-                let r = r.cast_into(dtype);
-                &l - &r
-            }
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l - &r.cast_into(l_dtype),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => &l.cast_into(r_dtype) - r,
+                (l, r) => unreachable!("subtract {}, {}", l, r),
+            },
         }
     }
 }
 
-impl SubAssign for Array {
-    fn sub_assign(&mut self, other: Self) {
-        let diff = &*self - &other;
+impl Sub<Number> for &Array {
+    type Output = Array;
+
+    fn sub(self, rhs: Number) -> Self::Output {
+        use number_general::Complex;
+        match (self, rhs) {
+            (Array::Bool(l), Number::Bool(r)) => Array::Bool(l - bool::from(r)),
+
+            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32(l - r),
+            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64(l - r),
+
+            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32(l - r),
+            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64(l - r),
+
+            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16(l - r),
+            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32(l - r),
+            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64(l - r),
+
+            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8(l - r),
+            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16(l - r),
+            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32(l - r),
+            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64(l - r),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l - r.into_type(l_dtype),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => &l.cast_into(r_dtype) - r,
+                (l, r) => unreachable!("subtract {}, {}", l, r),
+            },
+        }
+    }
+}
+
+impl SubAssign<&Array> for Array {
+    fn sub_assign(&mut self, other: &Array) {
+        let diff = &*self - other;
         *self = diff;
+    }
+}
+
+impl SubAssign<Number> for Array {
+    fn sub_assign(&mut self, rhs: Number) {
+        *self = &*self - rhs;
     }
 }
 
@@ -902,20 +968,57 @@ impl Mul for &Array {
             (U16(l), U16(r)) => U16(l * r),
             (U32(l), U32(r)) => U32(l * r),
             (U64(l), U64(r)) => U64(l * r),
-            (l, r) => {
-                let dtype = Ord::max(l.dtype(), r.dtype());
-                let l = l.cast_into(dtype);
-                let r = r.cast_into(dtype);
-                &l * &r
-            }
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l * &r.cast_into(l_dtype),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => &l.cast_into(r_dtype) * r,
+                (l, r) => unreachable!("multiply {}, {}", l, r),
+            },
         }
     }
 }
 
-impl MulAssign for Array {
-    fn mul_assign(&mut self, other: Array) {
-        let product = &*self * &other;
+impl Mul<Number> for &Array {
+    type Output = Array;
+
+    fn mul(self, rhs: Number) -> Self::Output {
+        use number_general::Complex;
+        match (self, rhs) {
+            (Array::Bool(l), Number::Bool(r)) => Array::Bool(l * bool::from(r)),
+
+            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32(l * r),
+            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64(l * r),
+
+            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32(l * r),
+            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64(l * r),
+
+            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16(l * r),
+            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32(l * r),
+            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64(l * r),
+
+            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8(l * r),
+            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16(l * r),
+            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32(l * r),
+            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64(l * r),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l * r.into_type(l_dtype),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => &l.cast_into(r_dtype) * r,
+                (l, r) => unreachable!("subtract {}, {}", l, r),
+            },
+        }
+    }
+}
+
+impl MulAssign<&Array> for Array {
+    fn mul_assign(&mut self, other: &Array) {
+        let product = &*self * other;
         *self = product;
+    }
+}
+
+impl MulAssign<Number> for Array {
+    fn mul_assign(&mut self, rhs: Number) {
+        *self = &*self * rhs;
     }
 }
 
@@ -926,11 +1029,9 @@ impl Div for &Array {
         use Array::*;
         match (self, other) {
             (Bool(l), Bool(r)) => Bool(l / r),
-            // dividing an F32 array causes a stack overflow
-            (C32(l), C32(r)) => &C64(l.type_cast()) / &C64(r.type_cast()),
+            (C32(l), C32(r)) => C32(l / r),
             (C64(l), C64(r)) => C64(l / r),
-            // dividing an F32 array causes a stack overflow
-            (F32(l), F32(r)) => &F64(l.type_cast()) / &F64(r.type_cast()),
+            (F32(l), F32(r)) => F32(l / r),
             (F64(l), F64(r)) => F64(l / r),
             (I16(l), I16(r)) => I16(l / r),
             (I32(l), I32(r)) => I32(l / r),
@@ -939,22 +1040,60 @@ impl Div for &Array {
             (U16(l), U16(r)) => U16(l / r),
             (U32(l), U32(r)) => U32(l / r),
             (U64(l), U64(r)) => U64(l / r),
-            (l, r) => {
-                let dtype = Ord::max(l.dtype(), r.dtype());
-                let l = l.cast_into(dtype);
-                let r = r.cast_into(dtype);
-                &l / &r
-            }
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l / &r.cast_into(l_dtype),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => &l.cast_into(r_dtype) / r,
+                (l, r) => unreachable!("divide {}, {}", l, r),
+            },
         }
     }
 }
 
-impl DivAssign for Array {
-    fn div_assign(&mut self, other: Array) {
-        let div = &*self / &other;
+impl Div<Number> for &Array {
+    type Output = Array;
+
+    fn div(self, rhs: Number) -> Self::Output {
+        use number_general::Complex;
+        match (self, rhs) {
+            (Array::Bool(l), Number::Bool(r)) => Array::Bool(l / bool::from(r)),
+
+            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32(l / r),
+            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64(l / r),
+
+            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32(l / r),
+            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64(l / r),
+
+            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16(l / r),
+            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32(l / r),
+            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64(l / r),
+
+            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8(l / r),
+            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16(l / r),
+            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32(l / r),
+            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64(l / r),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l / r.into_type(l_dtype),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => &l.cast_into(r_dtype) / r,
+                (l, r) => unreachable!("subtract {}, {}", l, r),
+            },
+        }
+    }
+}
+
+impl DivAssign<&Array> for Array {
+    fn div_assign(&mut self, other: &Array) {
+        let div = &*self / other;
         *self = div;
     }
 }
+
+impl DivAssign<Number> for Array {
+    fn div_assign(&mut self, rhs: Number) {
+        *self = &*self / rhs;
+    }
+}
+
 impl<T: af::HasAfEnum> CastFrom<Array> for ArrayExt<T> {
     fn cast_from(array: Array) -> ArrayExt<T> {
         use Array::*;
@@ -1342,6 +1481,7 @@ mod tests {
         actual
             .set(&(&[1, 2][..]).into(), &Array::from(&[4, 5][..]))
             .unwrap();
+
         let expected = Array::from(&[1, 4, 5][..]);
         assert_eq!(actual, expected)
     }
@@ -1354,6 +1494,8 @@ mod tests {
 
         let b: Array = [3, 2, 1][..].into();
         assert_eq!(&a + &b, [4, 4, 4][..].into());
+
+        assert_eq!(&b + Number::from(1), [4, 3, 2][..].into());
     }
 
     #[test]
@@ -1364,6 +1506,8 @@ mod tests {
 
         let b: Array = [-1., -4., 4.][..].into();
         assert_eq!(&a + &b, [0., -2., 7.][..].into());
+
+        assert_eq!(&b + Number::from(3), [2, -1, 7][..].into());
     }
 
     #[test]
