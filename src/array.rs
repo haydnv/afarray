@@ -741,15 +741,32 @@ impl Array {
         // af::pow only works with floating point numbers!
         use Array::*;
         match (self, other) {
-            (C32(l), C32(r)) => C32(l.pow(r)),
-            (C64(l), C64(r)) => C64(l.pow(r)),
-            (F32(l), F32(r)) => F32(l.pow(r)),
-            (F64(l), F64(r)) => F64(l.pow(r)),
-            (l, r) => {
-                let l = F64(l.type_cast());
-                let r = F64(r.type_cast());
-                l.pow(&r)
-            }
+            (C32(l), C32(r)) => C32(l.pow(r.deref())),
+            (C64(l), C64(r)) => C64(l.pow(r.deref())),
+            (F32(l), F32(r)) => F32(l.pow(r.deref())),
+            (F64(l), F64(r)) => F64(l.pow(r.deref())),
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.pow(&r.cast_into(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).pow(r),
+                _ => Self::F64(l.type_cast()).pow(r),
+            },
+        }
+    }
+
+    /// Return this `Array` raised to the power of `other`.
+    pub fn pow_const(&self, other: Number) -> Self {
+        // af::pow only works with floating point numbers!
+        use number_general::Complex;
+        match (self, other) {
+            (Self::C32(l), Number::Complex(Complex::C32(r))) => Self::C32(l.pow(&r)),
+            (Self::C64(l), Number::Complex(Complex::C64(r))) => Self::C64(l.pow(&r)),
+            (Self::F32(l), Number::Float(Float::F32(r))) => Self::F32(l.pow(&r)),
+            (Self::F64(l), Number::Float(Float::F64(r))) => Self::F64(l.pow(&r)),
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.pow_const(r.into_type(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).pow_const(r),
+                _ => Self::F64(l.type_cast()).pow_const(r),
+            },
         }
     }
 

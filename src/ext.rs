@@ -72,6 +72,11 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
         af::join(0, left, right).into()
     }
 
+    /// Raise `e` to the power of `self`.
+    pub fn exp(&self) -> ArrayExt<T::UnaryOutType> {
+        af::exp(self).into()
+    }
+
     /// Return `true` if the elements of this `ArrayExt` are in sorted order.
     pub fn is_sorted(&self) -> bool
     where
@@ -629,33 +634,25 @@ where
 }
 
 /// Defines an exponentiation method `pow`.
-pub trait ArrayInstancePow: ArrayInstance {
-    type Exp: af::HasAfEnum;
+pub trait ArrayInstancePow<U>: ArrayInstance {
     type Pow: af::HasAfEnum;
 
-    /// Raise `e` to the power of `self`.
-    fn exp(&self) -> ArrayExt<Self::Exp>;
-
     /// Calculate the element-wise exponentiation.
-    fn pow(&self, other: &Self) -> ArrayExt<Self::Pow>;
+    fn pow(&self, other: &U) -> ArrayExt<Self::Pow>;
 }
 
-impl<T> ArrayInstancePow for ArrayExt<T>
+impl<T, U> ArrayInstancePow<U> for ArrayExt<T>
 where
-    T: af::HasAfEnum + af::ConstGenerator<OutType = T> + Clone + Default,
-    T::UnaryOutType: af::HasAfEnum,
-    <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-    <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum,
+    T: af::HasAfEnum + af::Convertable<OutType = T>,
+    U: af::Convertable<OutType = T>,
+    <T as af::Convertable>::OutType: af::ImplicitPromote<T> + af::ImplicitPromote<<U as af::Convertable>::OutType>,
+    <U as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+    <<T as af::Convertable>::OutType as af::ImplicitPromote<<U as af::Convertable>::OutType>>::Output: af::HasAfEnum,
 {
-    type Exp = T::UnaryOutType;
-    type Pow = <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output;
+    type Pow = <<T as af::Convertable>::OutType as af::ImplicitPromote<<U as af::Convertable>::OutType>>::Output;
 
-    fn exp(&self) -> ArrayExt<Self::Exp> {
-        af::exp(self).into()
-    }
-
-    fn pow(&self, other: &Self) -> ArrayExt<Self::Pow> {
-        af::pow(self.deref(), other.deref(), true).into()
+    fn pow(&self, other: &U) -> ArrayExt<Self::Pow> {
+        ArrayExt(af::pow(self.deref(), other, true))
     }
 }
 
