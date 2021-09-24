@@ -268,6 +268,25 @@ impl Array {
         }
     }
 
+    /// Raise `e` to the power of `self`.
+    pub fn exp(&self) -> Array {
+        use Array::*;
+        match self {
+            Bool(l) => l.exp().into(),
+            C32(l) => l.exp().into(),
+            C64(l) => l.exp().into(),
+            F32(l) => l.exp().into(),
+            F64(l) => l.exp().into(),
+            I16(l) => l.exp().into(),
+            I32(l) => l.exp().into(),
+            I64(l) => l.exp().into(),
+            U8(l) => l.exp().into(),
+            U16(l) => l.exp().into(),
+            U32(l) => l.exp().into(),
+            U64(l) => l.exp().into(),
+        }
+    }
+
     /// Element-wise greater-than comparison.
     pub fn gt(&self, other: &Array) -> Array {
         use Array::*;

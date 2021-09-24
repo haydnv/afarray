@@ -636,7 +636,11 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T>> ArrayInstanceCompare for ArrayEx
 
 /// Defines an exponentiation method `pow`.
 pub trait ArrayInstancePow: ArrayInstance {
+    type Exp: af::HasAfEnum;
     type Pow: af::HasAfEnum;
+
+    /// Raise `e` to the power of `self`.
+    fn exp(&self) -> ArrayExt<Self::Exp>;
 
     /// Calculate the element-wise exponentiation.
     fn pow(&self, other: &Self) -> ArrayExt<Self::Pow>;
@@ -645,10 +649,16 @@ pub trait ArrayInstancePow: ArrayInstance {
 impl<T> ArrayInstancePow for ArrayExt<T>
 where
     T: af::HasAfEnum + af::ConstGenerator<OutType = T> + Clone + Default,
+    T::UnaryOutType: af::HasAfEnum,
     <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
     <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum,
 {
+    type Exp = T::UnaryOutType;
     type Pow = <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output;
+
+    fn exp(&self) -> ArrayExt<Self::Exp> {
+        af::exp(self.af()).into()
+    }
 
     fn pow(&self, other: &Self) -> ArrayExt<Self::Pow> {
         af::pow(self.af(), other.af(), true).into()
