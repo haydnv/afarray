@@ -282,6 +282,30 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> A
     }
 }
 
+impl<T: af::HasAfEnum, U: af::HasAfEnum> Add<U> for ArrayExt<T>
+where
+    T: af::ImplicitPromote<U>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    type Output = ArrayExt<<T as af::ImplicitPromote<U>>::Output>;
+
+    fn add(self, rhs: U) -> Self::Output {
+        (self.af() + rhs).into()
+    }
+}
+
+impl<T: af::HasAfEnum, U: af::HasAfEnum> Add<U> for &ArrayExt<T>
+where
+    T: af::ImplicitPromote<U>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    type Output = ArrayExt<<T as af::ImplicitPromote<U>>::Output>;
+
+    fn add(self, rhs: U) -> Self::Output {
+        (self.af() + rhs).into()
+    }
+}
+
 impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> AddAssign for ArrayExt<T>
     where
         <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
@@ -291,6 +315,16 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> A
     fn add_assign(&mut self, other: Self) {
         let sum = &*self + &other;
         *self = sum.type_cast();
+    }
+}
+
+impl<T: af::HasAfEnum, U: af::HasAfEnum> AddAssign<U> for ArrayExt<T>
+where
+    T: af::ImplicitPromote<U, Output = T>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    fn add_assign(&mut self, rhs: U) {
+        *self = &*self + rhs;
     }
 }
 
@@ -320,6 +354,30 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> M
     }
 }
 
+impl<T: af::HasAfEnum, U: af::HasAfEnum> Mul<U> for ArrayExt<T>
+where
+    T: af::ImplicitPromote<U>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    type Output = ArrayExt<<T as af::ImplicitPromote<U>>::Output>;
+
+    fn mul(self, rhs: U) -> Self::Output {
+        (self.af() * rhs).into()
+    }
+}
+
+impl<T: af::HasAfEnum, U: af::HasAfEnum> Mul<U> for &ArrayExt<T>
+where
+    T: af::ImplicitPromote<U>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    type Output = ArrayExt<<T as af::ImplicitPromote<U>>::Output>;
+
+    fn mul(self, rhs: U) -> Self::Output {
+        (self.af() * rhs).into()
+    }
+}
+
 impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> MulAssign for ArrayExt<T>
     where
         <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
@@ -329,6 +387,16 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> M
     fn mul_assign(&mut self, other: Self) {
         let product = &*self * &other;
         *self = product.type_cast();
+    }
+}
+
+impl<T: af::HasAfEnum, U: af::HasAfEnum> MulAssign<U> for ArrayExt<T>
+where
+    T: af::ImplicitPromote<U, Output = T>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    fn mul_assign(&mut self, rhs: U) {
+        *self = &*self * rhs;
     }
 }
 
@@ -358,6 +426,53 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> D
     }
 }
 
+impl<T: af::HasAfEnum, U: af::HasAfEnum> Div<U> for ArrayExt<T>
+where
+    T: af::ImplicitPromote<U>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    type Output = ArrayExt<<T as af::ImplicitPromote<U>>::Output>;
+
+    fn div(self, rhs: U) -> Self::Output {
+        (self.af() / rhs).into()
+    }
+}
+
+impl<T: af::HasAfEnum, U: af::HasAfEnum> Div<U> for &ArrayExt<T>
+where
+    T: af::ImplicitPromote<U>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    type Output = ArrayExt<<T as af::ImplicitPromote<U>>::Output>;
+
+    fn div(self, rhs: U) -> Self::Output {
+        (self.af() / rhs).into()
+    }
+}
+
+impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> DivAssign for ArrayExt<T>
+where
+    <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+    <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+    <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum
+{
+
+    fn div_assign(&mut self, other: Self) {
+        let quotient = &*self / &other;
+        *self = quotient.type_cast();
+    }
+}
+
+impl<T: af::HasAfEnum, U: af::HasAfEnum> DivAssign<U> for ArrayExt<T>
+where
+    T: af::ImplicitPromote<U, Output = T>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    fn div_assign(&mut self, rhs: U) {
+        *self = &*self / rhs;
+    }
+}
+
 impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Sub for ArrayExt<T>
     where
         <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
@@ -384,6 +499,30 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> S
     }
 }
 
+impl<T: af::HasAfEnum, U: af::HasAfEnum> Sub<U> for ArrayExt<T>
+where
+    T: af::ImplicitPromote<U>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    type Output = ArrayExt<<T as af::ImplicitPromote<U>>::Output>;
+
+    fn sub(self, rhs: U) -> Self::Output {
+        (self.af() - rhs).into()
+    }
+}
+
+impl<T: af::HasAfEnum, U: af::HasAfEnum> Sub<U> for &ArrayExt<T>
+where
+    T: af::ImplicitPromote<U>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    type Output = ArrayExt<<T as af::ImplicitPromote<U>>::Output>;
+
+    fn sub(self, rhs: U) -> Self::Output {
+        (self.af() - rhs).into()
+    }
+}
+
 impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> SubAssign for ArrayExt<T>
     where
         <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
@@ -393,6 +532,16 @@ impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> S
     fn sub_assign(&mut self, other: Self) {
         let diff = &*self - &other;
         *self = diff.type_cast();
+    }
+}
+
+impl<T: af::HasAfEnum, U: af::HasAfEnum> SubAssign<U> for ArrayExt<T>
+where
+    T: af::ImplicitPromote<U, Output = T>,
+    U: Clone + af::ImplicitPromote<T> + af::ConstGenerator<OutType = U>,
+{
+    fn sub_assign(&mut self, rhs: U) {
+        *self = &*self - rhs;
     }
 }
 
