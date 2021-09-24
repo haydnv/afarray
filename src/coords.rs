@@ -445,6 +445,12 @@ impl Deref for Coords {
     }
 }
 
+impl DerefMut for Coords {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.array
+    }
+}
+
 /// A [`Stream`] of [`Coords`], as constructed from an input stream of [`Coord`]s.
 pub struct CoordBlocks<S> {
     source: Fuse<S>,

@@ -13,7 +13,7 @@ use serde::ser::{Serialize, Serializer};
 use super::{dim4, Complex};
 
 /// Defines common access methods for instance of [`ArrayExt`].
-pub trait ArrayInstance: Deref<Target = af::Array<Self::DType>> {
+pub trait ArrayInstance: Deref<Target = af::Array<Self::DType>> + DerefMut {
     type DType: af::HasAfEnum;
 
     /// Cast this instance into an [`af::Array`] with type `T`.
@@ -178,6 +178,12 @@ impl<T: af::HasAfEnum> Deref for ArrayExt<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<T: af::HasAfEnum> DerefMut for ArrayExt<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
