@@ -273,6 +273,35 @@ impl Array {
         }
     }
 
+    /// Element-wise equality comparison.
+    pub fn eq_const(&self, other: Number) -> Array {
+        use number_general::Complex;
+        match (self, other) {
+            (Self::Bool(l), Number::Bool(r)) => Self::Bool(l.eq(&bool::from(r))),
+
+            (Self::C32(l), Number::Complex(Complex::C32(r))) => Self::Bool(l.eq(&r)),
+            (Self::C64(l), Number::Complex(Complex::C64(r))) => Self::Bool(l.eq(&r)),
+
+            (Self::F32(l), Number::Float(Float::F32(r))) => Self::Bool(l.eq(&r)),
+            (Self::F64(l), Number::Float(Float::F64(r))) => Self::Bool(l.eq(&r)),
+
+            (Self::I16(l), Number::Int(Int::I16(r))) => Self::Bool(l.eq(&r)),
+            (Self::I32(l), Number::Int(Int::I32(r))) => Self::Bool(l.eq(&r)),
+            (Self::I64(l), Number::Int(Int::I64(r))) => Self::Bool(l.eq(&r)),
+
+            (Self::U8(l), Number::UInt(UInt::U8(r))) => Self::Bool(l.eq(&r)),
+            (Self::U16(l), Number::UInt(UInt::U16(r))) => Self::Bool(l.eq(&r)),
+            (Self::U32(l), Number::UInt(UInt::U32(r))) => Self::Bool(l.eq(&r)),
+            (Self::U64(l), Number::UInt(UInt::U64(r))) => Self::Bool(l.eq(&r)),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.eq_const(r.into_type(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).eq_const(r),
+                (l, r) => unreachable!("{} equal to {}", l, r),
+            },
+        }
+    }
+
     /// Raise `e` to the power of `self`.
     pub fn exp(&self) -> Array {
         use Array::*;
@@ -316,6 +345,30 @@ impl Array {
         }
     }
 
+    /// Element-wise greater-than comparison.
+    pub fn gt_const(&self, other: Number) -> Array {
+        use number_general::Complex;
+        match (self, other) {
+            (Self::Bool(l), Number::Bool(r)) => Self::Bool(l.gt(&bool::from(r))),
+            (Self::C32(l), Number::Complex(Complex::C32(r))) => Self::Bool(l.gt(&r)),
+            (Self::C64(l), Number::Complex(Complex::C64(r))) => Self::Bool(l.gt(&r)),
+            (Self::F32(l), Number::Float(Float::F32(r))) => Self::Bool(l.gt(&r)),
+            (Self::F64(l), Number::Float(Float::F64(r))) => Self::Bool(l.gt(&r)),
+            (Self::I16(l), Number::Int(Int::I16(r))) => Self::Bool(l.gt(&r)),
+            (Self::I32(l), Number::Int(Int::I32(r))) => Self::Bool(l.gt(&r)),
+            (Self::I64(l), Number::Int(Int::I64(r))) => Self::Bool(l.gt(&r)),
+            (Self::U8(l), Number::UInt(UInt::U8(r))) => Self::Bool(l.gt(&r)),
+            (Self::U16(l), Number::UInt(UInt::U16(r))) => Self::Bool(l.gt(&r)),
+            (Self::U32(l), Number::UInt(UInt::U32(r))) => Self::Bool(l.gt(&r)),
+            (Self::U64(l), Number::UInt(UInt::U64(r))) => Self::Bool(l.gt(&r)),
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.gt_const(r.into_type(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).gt_const(r),
+                (l, r) => unreachable!("{} greater than {}", l, r),
+            },
+        }
+    }
+
     /// Element-wise greater-or-equal comparison.
     pub fn gte(&self, other: &Array) -> Array {
         use Array::*;
@@ -335,6 +388,35 @@ impl Array {
             (l, r) => match (l.dtype(), r.dtype()) {
                 (l_dtype, r_dtype) if l_dtype > r_dtype => l.gte(&r.cast_into(l_dtype)),
                 (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).gte(r),
+                (l, r) => unreachable!("{} greater than or equal to {}", l, r),
+            },
+        }
+    }
+
+    /// Element-wise greater-than-or-equal comparison.
+    pub fn gte_const(&self, other: Number) -> Array {
+        use number_general::Complex;
+        match (self, other) {
+            (Self::Bool(l), Number::Bool(r)) => Self::Bool(l.gte(&bool::from(r))),
+
+            (Self::C32(l), Number::Complex(Complex::C32(r))) => Self::Bool(l.gte(&r)),
+            (Self::C64(l), Number::Complex(Complex::C64(r))) => Self::Bool(l.gte(&r)),
+
+            (Self::F32(l), Number::Float(Float::F32(r))) => Self::Bool(l.gte(&r)),
+            (Self::F64(l), Number::Float(Float::F64(r))) => Self::Bool(l.gte(&r)),
+
+            (Self::I16(l), Number::Int(Int::I16(r))) => Self::Bool(l.gte(&r)),
+            (Self::I32(l), Number::Int(Int::I32(r))) => Self::Bool(l.gte(&r)),
+            (Self::I64(l), Number::Int(Int::I64(r))) => Self::Bool(l.gte(&r)),
+
+            (Self::U8(l), Number::UInt(UInt::U8(r))) => Self::Bool(l.gte(&r)),
+            (Self::U16(l), Number::UInt(UInt::U16(r))) => Self::Bool(l.gte(&r)),
+            (Self::U32(l), Number::UInt(UInt::U32(r))) => Self::Bool(l.gte(&r)),
+            (Self::U64(l), Number::UInt(UInt::U64(r))) => Self::Bool(l.gte(&r)),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.gte_const(r.into_type(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).gte_const(r),
                 (l, r) => unreachable!("{} greater than or equal to {}", l, r),
             },
         }
@@ -402,6 +484,35 @@ impl Array {
         }
     }
 
+    /// Element-wise less-than comparison.
+    pub fn lt_const(&self, other: Number) -> Array {
+        use number_general::Complex;
+        match (self, other) {
+            (Self::Bool(l), Number::Bool(r)) => Self::Bool(l.lt(&bool::from(r))),
+
+            (Self::C32(l), Number::Complex(Complex::C32(r))) => Self::Bool(l.lt(&r)),
+            (Self::C64(l), Number::Complex(Complex::C64(r))) => Self::Bool(l.lt(&r)),
+
+            (Self::F32(l), Number::Float(Float::F32(r))) => Self::Bool(l.lt(&r)),
+            (Self::F64(l), Number::Float(Float::F64(r))) => Self::Bool(l.lt(&r)),
+
+            (Self::I16(l), Number::Int(Int::I16(r))) => Self::Bool(l.lt(&r)),
+            (Self::I32(l), Number::Int(Int::I32(r))) => Self::Bool(l.lt(&r)),
+            (Self::I64(l), Number::Int(Int::I64(r))) => Self::Bool(l.lt(&r)),
+
+            (Self::U8(l), Number::UInt(UInt::U8(r))) => Self::Bool(l.lt(&r)),
+            (Self::U16(l), Number::UInt(UInt::U16(r))) => Self::Bool(l.lt(&r)),
+            (Self::U32(l), Number::UInt(UInt::U32(r))) => Self::Bool(l.lt(&r)),
+            (Self::U64(l), Number::UInt(UInt::U64(r))) => Self::Bool(l.lt(&r)),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.lt_const(r.into_type(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).lt_const(r),
+                (l, r) => unreachable!("{} less than {}", l, r),
+            },
+        }
+    }
+
     /// Element-wise less-or-equal comparison.
     pub fn lte(&self, other: &Array) -> Array {
         use Array::*;
@@ -426,6 +537,35 @@ impl Array {
         }
     }
 
+    /// Element-wise less-than-or-equal comparison.
+    pub fn lte_const(&self, other: Number) -> Array {
+        use number_general::Complex;
+        match (self, other) {
+            (Self::Bool(l), Number::Bool(r)) => Self::Bool(l.lte(&bool::from(r))),
+
+            (Self::C32(l), Number::Complex(Complex::C32(r))) => Self::Bool(l.lte(&r)),
+            (Self::C64(l), Number::Complex(Complex::C64(r))) => Self::Bool(l.lte(&r)),
+
+            (Self::F32(l), Number::Float(Float::F32(r))) => Self::Bool(l.lte(&r)),
+            (Self::F64(l), Number::Float(Float::F64(r))) => Self::Bool(l.lte(&r)),
+
+            (Self::I16(l), Number::Int(Int::I16(r))) => Self::Bool(l.lte(&r)),
+            (Self::I32(l), Number::Int(Int::I32(r))) => Self::Bool(l.lte(&r)),
+            (Self::I64(l), Number::Int(Int::I64(r))) => Self::Bool(l.lte(&r)),
+
+            (Self::U8(l), Number::UInt(UInt::U8(r))) => Self::Bool(l.lte(&r)),
+            (Self::U16(l), Number::UInt(UInt::U16(r))) => Self::Bool(l.lte(&r)),
+            (Self::U32(l), Number::UInt(UInt::U32(r))) => Self::Bool(l.lte(&r)),
+            (Self::U64(l), Number::UInt(UInt::U64(r))) => Self::Bool(l.lte(&r)),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.lte_const(r.into_type(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).lte_const(r),
+                (l, r) => unreachable!("{} less than or equal to {}", l, r),
+            },
+        }
+    }
+
     /// Element-wise inequality comparison.
     pub fn ne(&self, other: &Array) -> Array {
         use Array::*;
@@ -445,6 +585,35 @@ impl Array {
             (l, r) => match (l.dtype(), r.dtype()) {
                 (l_dtype, r_dtype) if l_dtype > r_dtype => l.ne(&r.cast_into(l_dtype)),
                 (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).ne(r),
+                (l, r) => unreachable!("{} not equal to {}", l, r),
+            },
+        }
+    }
+
+    /// Element-wise not-equal comparison.
+    pub fn ne_const(&self, other: Number) -> Array {
+        use number_general::Complex;
+        match (self, other) {
+            (Self::Bool(l), Number::Bool(r)) => Self::Bool(l.ne(&bool::from(r))),
+
+            (Self::C32(l), Number::Complex(Complex::C32(r))) => Self::Bool(l.ne(&r)),
+            (Self::C64(l), Number::Complex(Complex::C64(r))) => Self::Bool(l.ne(&r)),
+
+            (Self::F32(l), Number::Float(Float::F32(r))) => Self::Bool(l.ne(&r)),
+            (Self::F64(l), Number::Float(Float::F64(r))) => Self::Bool(l.ne(&r)),
+
+            (Self::I16(l), Number::Int(Int::I16(r))) => Self::Bool(l.ne(&r)),
+            (Self::I32(l), Number::Int(Int::I32(r))) => Self::Bool(l.ne(&r)),
+            (Self::I64(l), Number::Int(Int::I64(r))) => Self::Bool(l.ne(&r)),
+
+            (Self::U8(l), Number::UInt(UInt::U8(r))) => Self::Bool(l.ne(&r)),
+            (Self::U16(l), Number::UInt(UInt::U16(r))) => Self::Bool(l.ne(&r)),
+            (Self::U32(l), Number::UInt(UInt::U32(r))) => Self::Bool(l.ne(&r)),
+            (Self::U64(l), Number::UInt(UInt::U64(r))) => Self::Bool(l.ne(&r)),
+
+            (l, r) => match (l.dtype(), r.class()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.ne_const(r.into_type(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).ne_const(r),
                 (l, r) => unreachable!("{} not equal to {}", l, r),
             },
         }
@@ -1513,6 +1682,14 @@ mod tests {
         assert_eq!(&a + &b, [0., -2., 7.][..].into());
 
         assert_eq!(&b + Number::from(3), [2, -1, 7][..].into());
+    }
+
+    #[test]
+    fn test_gte() {
+        let a: Array = [0, 1, 2][..].into();
+        let b: Array = [1][..].into();
+        assert_eq!(a.gte(&b), [false, true, true][..].into());
+        assert_eq!(a.gte_const(Number::from(1)), [false, true, true][..].into());
     }
 
     #[test]
