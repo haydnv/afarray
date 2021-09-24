@@ -252,19 +252,24 @@ impl Array {
     /// Element-wise equality comparison.
     pub fn eq(&self, other: &Array) -> Array {
         use Array::*;
-        match self {
-            Bool(l) => Bool(l.eq(&other.type_cast())),
-            C32(l) => Bool(l.eq(&other.type_cast())),
-            C64(l) => Bool(l.eq(&other.type_cast())),
-            F32(l) => Bool(l.eq(&other.type_cast())),
-            F64(l) => Bool(l.eq(&other.type_cast())),
-            I16(l) => Bool(l.eq(&other.type_cast())),
-            I32(l) => Bool(l.eq(&other.type_cast())),
-            I64(l) => Bool(l.eq(&other.type_cast())),
-            U8(l) => Bool(l.eq(&other.type_cast())),
-            U16(l) => Bool(l.eq(&other.type_cast())),
-            U32(l) => Bool(l.eq(&other.type_cast())),
-            U64(l) => Bool(l.eq(&other.type_cast())),
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l.eq(r.deref())),
+            (C32(l), C32(r)) => Bool(l.eq(r.deref())),
+            (C64(l), C64(r)) => Bool(l.eq(r.deref())),
+            (F32(l), F32(r)) => Bool(l.eq(r.deref())),
+            (F64(l), F64(r)) => Bool(l.eq(r.deref())),
+            (I16(l), I16(r)) => Bool(l.eq(r.deref())),
+            (I32(l), I32(r)) => Bool(l.eq(r.deref())),
+            (I64(l), I64(r)) => Bool(l.eq(r.deref())),
+            (U8(l), U8(r)) => Bool(l.eq(r.deref())),
+            (U16(l), U16(r)) => Bool(l.eq(r.deref())),
+            (U32(l), U32(r)) => Bool(l.eq(r.deref())),
+            (U64(l), U64(r)) => Bool(l.eq(r.deref())),
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.eq(&r.cast_into(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).eq(r),
+                (l, r) => unreachable!("{} equal to {}", l, r),
+            },
         }
     }
 
@@ -290,38 +295,48 @@ impl Array {
     /// Element-wise greater-than comparison.
     pub fn gt(&self, other: &Array) -> Array {
         use Array::*;
-        match self {
-            Bool(l) => Bool(l.gt(&other.type_cast())),
-            C32(l) => Bool(l.gt(&other.type_cast())),
-            C64(l) => Bool(l.gt(&other.type_cast())),
-            F32(l) => Bool(l.gt(&other.type_cast())),
-            F64(l) => Bool(l.gt(&other.type_cast())),
-            I16(l) => Bool(l.gt(&other.type_cast())),
-            I32(l) => Bool(l.gt(&other.type_cast())),
-            I64(l) => Bool(l.gt(&other.type_cast())),
-            U8(l) => Bool(l.gt(&other.type_cast())),
-            U16(l) => Bool(l.gt(&other.type_cast())),
-            U32(l) => Bool(l.gt(&other.type_cast())),
-            U64(l) => Bool(l.gt(&other.type_cast())),
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l.gt(r.deref())),
+            (C32(l), C32(r)) => Bool(l.gt(r.deref())),
+            (C64(l), C64(r)) => Bool(l.gt(r.deref())),
+            (F32(l), F32(r)) => Bool(l.gt(r.deref())),
+            (F64(l), F64(r)) => Bool(l.gt(r.deref())),
+            (I16(l), I16(r)) => Bool(l.gt(r.deref())),
+            (I32(l), I32(r)) => Bool(l.gt(r.deref())),
+            (I64(l), I64(r)) => Bool(l.gt(r.deref())),
+            (U8(l), U8(r)) => Bool(l.gt(r.deref())),
+            (U16(l), U16(r)) => Bool(l.gt(r.deref())),
+            (U32(l), U32(r)) => Bool(l.gt(r.deref())),
+            (U64(l), U64(r)) => Bool(l.gt(r.deref())),
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.gt(&r.cast_into(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).gt(r),
+                (l, r) => unreachable!("{} greater than {}", l, r),
+            },
         }
     }
 
     /// Element-wise greater-or-equal comparison.
     pub fn gte(&self, other: &Array) -> Array {
         use Array::*;
-        match self {
-            Bool(l) => Bool(l.gte(&other.type_cast())),
-            C32(l) => Bool(l.gte(&other.type_cast())),
-            C64(l) => Bool(l.gte(&other.type_cast())),
-            F32(l) => Bool(l.gte(&other.type_cast())),
-            F64(l) => Bool(l.gte(&other.type_cast())),
-            I16(l) => Bool(l.gte(&other.type_cast())),
-            I32(l) => Bool(l.gte(&other.type_cast())),
-            I64(l) => Bool(l.gte(&other.type_cast())),
-            U8(l) => Bool(l.gte(&other.type_cast())),
-            U16(l) => Bool(l.gte(&other.type_cast())),
-            U32(l) => Bool(l.gte(&other.type_cast())),
-            U64(l) => Bool(l.gte(&other.type_cast())),
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l.gte(r.deref())),
+            (C32(l), C32(r)) => Bool(l.gte(r.deref())),
+            (C64(l), C64(r)) => Bool(l.gte(r.deref())),
+            (F32(l), F32(r)) => Bool(l.gte(r.deref())),
+            (F64(l), F64(r)) => Bool(l.gte(r.deref())),
+            (I16(l), I16(r)) => Bool(l.gte(r.deref())),
+            (I32(l), I32(r)) => Bool(l.gte(r.deref())),
+            (I64(l), I64(r)) => Bool(l.gte(r.deref())),
+            (U8(l), U8(r)) => Bool(l.gte(r.deref())),
+            (U16(l), U16(r)) => Bool(l.gte(r.deref())),
+            (U32(l), U32(r)) => Bool(l.gte(r.deref())),
+            (U64(l), U64(r)) => Bool(l.gte(r.deref())),
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.gte(&r.cast_into(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).gte(r),
+                (l, r) => unreachable!("{} greater than or equal to {}", l, r),
+            },
         }
     }
 
@@ -366,58 +381,72 @@ impl Array {
     /// Element-wise less-than comparison.
     pub fn lt(&self, other: &Array) -> Array {
         use Array::*;
-        match self {
-            Bool(l) => Bool(l.lt(&other.type_cast())),
-            C32(l) => Bool(l.lt(&other.type_cast())),
-            C64(l) => Bool(l.lt(&other.type_cast())),
-            F32(l) => Bool(l.lt(&other.type_cast())),
-            F64(l) => Bool(l.lt(&other.type_cast())),
-            I16(l) => Bool(l.lt(&other.type_cast())),
-            I32(l) => Bool(l.lt(&other.type_cast())),
-            I64(l) => Bool(l.lt(&other.type_cast())),
-            U8(l) => Bool(l.lt(&other.type_cast())),
-            U16(l) => Bool(l.lt(&other.type_cast())),
-            U32(l) => Bool(l.lt(&other.type_cast())),
-            U64(l) => Bool(l.lt(&other.type_cast())),
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l.lt(r.deref())),
+            (C32(l), C32(r)) => Bool(l.lt(r.deref())),
+            (C64(l), C64(r)) => Bool(l.lt(r.deref())),
+            (F32(l), F32(r)) => Bool(l.lt(r.deref())),
+            (F64(l), F64(r)) => Bool(l.lt(r.deref())),
+            (I16(l), I16(r)) => Bool(l.lt(r.deref())),
+            (I32(l), I32(r)) => Bool(l.lt(r.deref())),
+            (I64(l), I64(r)) => Bool(l.lt(r.deref())),
+            (U8(l), U8(r)) => Bool(l.lt(r.deref())),
+            (U16(l), U16(r)) => Bool(l.lt(r.deref())),
+            (U32(l), U32(r)) => Bool(l.lt(r.deref())),
+            (U64(l), U64(r)) => Bool(l.lt(r.deref())),
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.lt(&r.cast_into(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).lt(r),
+                (l, r) => unreachable!("{} less than {}", l, r),
+            },
         }
     }
 
     /// Element-wise less-or-equal comparison.
     pub fn lte(&self, other: &Array) -> Array {
         use Array::*;
-        match self {
-            Bool(l) => Bool(l.lte(&other.type_cast())),
-            C32(l) => Bool(l.lte(&other.type_cast())),
-            C64(l) => Bool(l.lte(&other.type_cast())),
-            F32(l) => Bool(l.lte(&other.type_cast())),
-            F64(l) => Bool(l.lte(&other.type_cast())),
-            I16(l) => Bool(l.lte(&other.type_cast())),
-            I32(l) => Bool(l.lte(&other.type_cast())),
-            I64(l) => Bool(l.lte(&other.type_cast())),
-            U8(l) => Bool(l.lte(&other.type_cast())),
-            U16(l) => Bool(l.lte(&other.type_cast())),
-            U32(l) => Bool(l.lte(&other.type_cast())),
-            U64(l) => Bool(l.lte(&other.type_cast())),
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l.lte(r.deref())),
+            (C32(l), C32(r)) => Bool(l.lte(r.deref())),
+            (C64(l), C64(r)) => Bool(l.lte(r.deref())),
+            (F32(l), F32(r)) => Bool(l.lte(r.deref())),
+            (F64(l), F64(r)) => Bool(l.lte(r.deref())),
+            (I16(l), I16(r)) => Bool(l.lte(r.deref())),
+            (I32(l), I32(r)) => Bool(l.lte(r.deref())),
+            (I64(l), I64(r)) => Bool(l.lte(r.deref())),
+            (U8(l), U8(r)) => Bool(l.lte(r.deref())),
+            (U16(l), U16(r)) => Bool(l.lte(r.deref())),
+            (U32(l), U32(r)) => Bool(l.lte(r.deref())),
+            (U64(l), U64(r)) => Bool(l.lte(r.deref())),
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.lte(&r.cast_into(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).lte(r),
+                (l, r) => unreachable!("{} less than or equal to {}", l, r),
+            },
         }
     }
 
     /// Element-wise inequality comparison.
     pub fn ne(&self, other: &Array) -> Array {
         use Array::*;
-
-        match self {
-            Bool(l) => Bool(l.ne(&other.type_cast())),
-            C32(l) => Bool(l.ne(&other.type_cast())),
-            C64(l) => Bool(l.ne(&other.type_cast())),
-            F32(l) => Bool(l.ne(&other.type_cast())),
-            F64(l) => Bool(l.ne(&other.type_cast())),
-            I16(l) => Bool(l.ne(&other.type_cast())),
-            I32(l) => Bool(l.ne(&other.type_cast())),
-            I64(l) => Bool(l.ne(&other.type_cast())),
-            U8(l) => Bool(l.ne(&other.type_cast())),
-            U16(l) => Bool(l.ne(&other.type_cast())),
-            U32(l) => Bool(l.ne(&other.type_cast())),
-            U64(l) => Bool(l.ne(&other.type_cast())),
+        match (self, other) {
+            (Bool(l), Bool(r)) => Bool(l.ne(r.deref())),
+            (C32(l), C32(r)) => Bool(l.ne(r.deref())),
+            (C64(l), C64(r)) => Bool(l.ne(r.deref())),
+            (F32(l), F32(r)) => Bool(l.ne(r.deref())),
+            (F64(l), F64(r)) => Bool(l.ne(r.deref())),
+            (I16(l), I16(r)) => Bool(l.ne(r.deref())),
+            (I32(l), I32(r)) => Bool(l.ne(r.deref())),
+            (I64(l), I64(r)) => Bool(l.ne(r.deref())),
+            (U8(l), U8(r)) => Bool(l.ne(r.deref())),
+            (U16(l), U16(r)) => Bool(l.ne(r.deref())),
+            (U32(l), U32(r)) => Bool(l.ne(r.deref())),
+            (U64(l), U64(r)) => Bool(l.ne(r.deref())),
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.ne(&r.cast_into(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).ne(r),
+                (l, r) => unreachable!("{} not equal to {}", l, r),
+            },
         }
     }
 
@@ -516,7 +545,7 @@ impl Array {
     /// Get the values at the specified coordinates.
     pub fn get(&self, index: &ArrayExt<u64>) -> Self {
         let mut indexer = af::Indexer::default();
-        indexer.set_index(index.af(), 0, None);
+        indexer.set_index(index.deref(), 0, None);
         self.get_at(indexer)
     }
 
@@ -543,7 +572,9 @@ impl Array {
         // af::pow only works with floating point numbers!
         use Array::*;
         match (self, other) {
+            (C32(l), C32(r)) => C32(l.pow(r)),
             (C64(l), C64(r)) => C64(l.pow(r)),
+            (F32(l), F32(r)) => F32(l.pow(r)),
             (F64(l), F64(r)) => F64(l.pow(r)),
             (l, r) => {
                 let l = F64(l.type_cast());
@@ -556,7 +587,7 @@ impl Array {
     /// Set the values at the specified coordinates to the corresponding values in `other`.
     pub fn set(&mut self, index: &ArrayExt<u64>, other: &Array) -> Result<()> {
         let mut indexer = af::Indexer::default();
-        indexer.set_index(index.af(), 0, None);
+        indexer.set_index(index.deref(), 0, None);
         self.set_at(indexer, other)
     }
 
@@ -771,33 +802,9 @@ impl PartialEq for Array {
     fn eq(&self, other: &Array) -> bool {
         if self.len() != other.len() {
             return false;
+        } else {
+            Array::eq(self, other).all()
         }
-
-        use Array::*;
-        let eq = match (self, other) {
-            (Bool(l), Bool(r)) => l.eq(r),
-            (C32(l), C32(r)) => l.eq(r),
-            (C64(l), C64(r)) => l.eq(r),
-            (F32(l), F32(r)) => l.eq(r),
-            (F64(l), F64(r)) => l.eq(r),
-            (I16(l), I16(r)) => l.eq(r),
-            (I32(l), I32(r)) => l.eq(r),
-            (I64(l), I64(r)) => l.eq(r),
-            (U8(l), U8(r)) => l.eq(r),
-            (U16(l), U16(r)) => l.eq(r),
-            (U32(l), U32(r)) => l.eq(r),
-            (U64(l), U64(r)) => l.eq(r),
-            (l, r) if l.dtype() > r.dtype() => {
-                let r = r.cast_into(l.dtype());
-                return l == &r;
-            }
-            (l, r) => {
-                let l = l.cast_into(r.dtype());
-                return &l == r;
-            }
-        };
-
-        eq.all()
     }
 }
 
@@ -834,23 +841,23 @@ impl Add<Number> for &Array {
     fn add(self, rhs: Number) -> Self::Output {
         use number_general::Complex;
         match (self, rhs) {
-            (Array::Bool(l), Number::Bool(r)) => Array::Bool(l + bool::from(r)),
+            (Array::Bool(l), Number::Bool(r)) => Array::Bool((l.deref() + bool::from(r)).into()),
 
-            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32(l + r),
-            (Array::F64(l), Number::Float(Float::F32(r))) => Array::F64(l + r),
-            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64(l + r),
+            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32((l.deref() + r).into()),
+            (Array::F64(l), Number::Float(Float::F32(r))) => Array::F64((l.deref() + r).into()),
+            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64((l.deref() + r).into()),
 
-            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32(l + r),
-            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64(l + r),
+            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32((l.deref() + r).into()),
+            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64((l.deref() + r).into()),
 
-            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16(l + r),
-            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32(l + r),
-            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64(l + r),
+            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16((l.deref() + r).into()),
+            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32((l.deref() + r).into()),
+            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64((l.deref() + r).into()),
 
-            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8(l + r),
-            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16(l + r),
-            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32(l + r),
-            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64(l + r),
+            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8((l.deref() + r).into()),
+            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16((l.deref() + r).into()),
+            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32((l.deref() + r).into()),
+            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64((l.deref() + r).into()),
 
             (l, r) => match (l.dtype(), r.class()) {
                 (l_dtype, r_dtype) if l_dtype > r_dtype => l + r.into_type(l_dtype),
@@ -881,11 +888,9 @@ impl Sub for &Array {
         use Array::*;
         match (self, other) {
             (Bool(l), Bool(r)) => Bool(l - r),
-            // Subtracting a 32-bit float causes a stack overflow
-            (C32(l), C32(r)) => &C64(l.type_cast()) - &C64(r.type_cast()),
+            (C32(l), C32(r)) => C32(l - r),
             (C64(l), C64(r)) => C64(l - r),
-            // Subtracting a 32-bit float causes a stack overflow
-            (F32(l), F32(r)) => &F64(l.type_cast()) - &F64(r.type_cast()),
+            (F32(l), F32(r)) => F32(l - r),
             (F64(l), F64(r)) => F64(l - r),
             (I16(l), I16(r)) => I16(l - r),
             (I32(l), I32(r)) => I32(l - r),
@@ -909,22 +914,22 @@ impl Sub<Number> for &Array {
     fn sub(self, rhs: Number) -> Self::Output {
         use number_general::Complex;
         match (self, rhs) {
-            (Array::Bool(l), Number::Bool(r)) => Array::Bool(l - bool::from(r)),
+            (Array::Bool(l), Number::Bool(r)) => Array::Bool((l.deref() - bool::from(r)).into()),
 
-            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32(l - r),
-            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64(l - r),
+            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32((l.deref() - r).into()),
+            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64((l.deref() - r).into()),
 
-            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32(l - r),
-            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64(l - r),
+            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32((l.deref() - r).into()),
+            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64((l.deref() - r).into()),
 
-            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16(l - r),
-            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32(l - r),
-            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64(l - r),
+            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16((l.deref() - r).into()),
+            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32((l.deref() - r).into()),
+            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64((l.deref() - r).into()),
 
-            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8(l - r),
-            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16(l - r),
-            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32(l - r),
-            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64(l - r),
+            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8((l.deref() - r).into()),
+            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16((l.deref() - r).into()),
+            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32((l.deref() - r).into()),
+            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64((l.deref() - r).into()),
 
             (l, r) => match (l.dtype(), r.class()) {
                 (l_dtype, r_dtype) if l_dtype > r_dtype => l - r.into_type(l_dtype),
@@ -983,22 +988,22 @@ impl Mul<Number> for &Array {
     fn mul(self, rhs: Number) -> Self::Output {
         use number_general::Complex;
         match (self, rhs) {
-            (Array::Bool(l), Number::Bool(r)) => Array::Bool(l * bool::from(r)),
+            (Array::Bool(l), Number::Bool(r)) => Array::Bool((l.deref() * bool::from(r)).into()),
 
-            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32(l * r),
-            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64(l * r),
+            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32((l.deref() * r).into()),
+            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64((l.deref() * r).into()),
 
-            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32(l * r),
-            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64(l * r),
+            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32((l.deref() * r).into()),
+            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64((l.deref() * r).into()),
 
-            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16(l * r),
-            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32(l * r),
-            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64(l * r),
+            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16((l.deref() * r).into()),
+            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32((l.deref() * r).into()),
+            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64((l.deref() * r).into()),
 
-            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8(l * r),
-            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16(l * r),
-            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32(l * r),
-            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64(l * r),
+            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8((l.deref() * r).into()),
+            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16((l.deref() * r).into()),
+            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32((l.deref() * r).into()),
+            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64((l.deref() * r).into()),
 
             (l, r) => match (l.dtype(), r.class()) {
                 (l_dtype, r_dtype) if l_dtype > r_dtype => l * r.into_type(l_dtype),
@@ -1055,22 +1060,22 @@ impl Div<Number> for &Array {
     fn div(self, rhs: Number) -> Self::Output {
         use number_general::Complex;
         match (self, rhs) {
-            (Array::Bool(l), Number::Bool(r)) => Array::Bool(l / bool::from(r)),
+            (Array::Bool(l), Number::Bool(r)) => Array::Bool((l.deref() / bool::from(r)).into()),
 
-            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32(l / r),
-            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64(l / r),
+            (Array::F32(l), Number::Float(Float::F32(r))) => Array::F32((l.deref() / r).into()),
+            (Array::F64(l), Number::Float(Float::F64(r))) => Array::F64((l.deref() / r).into()),
 
-            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32(l / r),
-            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64(l / r),
+            (Array::C32(l), Number::Complex(Complex::C32(r))) => Array::C32((l.deref() / r).into()),
+            (Array::C64(l), Number::Complex(Complex::C64(r))) => Array::C64((l.deref() / r).into()),
 
-            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16(l / r),
-            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32(l / r),
-            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64(l / r),
+            (Array::I16(l), Number::Int(Int::I16(r))) => Array::I16((l.deref() / r).into()),
+            (Array::I32(l), Number::Int(Int::I32(r))) => Array::I32((l.deref() / r).into()),
+            (Array::I64(l), Number::Int(Int::I64(r))) => Array::I64((l.deref() / r).into()),
 
-            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8(l / r),
-            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16(l / r),
-            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32(l / r),
-            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64(l / r),
+            (Array::U8(l), Number::UInt(UInt::U8(r))) => Array::U8((l.deref() / r).into()),
+            (Array::U16(l), Number::UInt(UInt::U16(r))) => Array::U16((l.deref() / r).into()),
+            (Array::U32(l), Number::UInt(UInt::U32(r))) => Array::U32((l.deref() / r).into()),
+            (Array::U64(l), Number::UInt(UInt::U64(r))) => Array::U64((l.deref() / r).into()),
 
             (l, r) => match (l.dtype(), r.class()) {
                 (l_dtype, r_dtype) if l_dtype > r_dtype => l / r.into_type(l_dtype),

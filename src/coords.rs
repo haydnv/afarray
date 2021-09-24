@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::iter::IntoIterator;
 use std::mem;
+use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -9,7 +10,7 @@ use futures::ready;
 use futures::stream::{Fuse, FusedStream, Stream, StreamExt, TryStream, TryStreamExt};
 use pin_project::pin_project;
 
-use super::{coord_bounds, dim4, ArrayExt, ArrayInstance};
+use super::{coord_bounds, dim4, ArrayExt};
 
 /// An n-dimensional coordinate.
 pub type Coord = Vec<u64>;
@@ -68,7 +69,7 @@ impl Coords {
         let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, dims);
         let af_shape: af::Array<u64> = af::Array::new(&shape, dims);
 
-        let offsets = af::div(offsets.af(), &af_coord_bounds, true);
+        let offsets = af::div(offsets.deref(), &af_coord_bounds, true);
         let coords = af::modulo(&offsets, &af_shape, true);
         let array = af::transpose(&coords, false);
 
@@ -132,18 +133,6 @@ impl Coords {
         Ok(Self { array, ndim })
     }
 
-    /// Borrow these `Coords` as an `af::Array<u64>`.
-    #[inline]
-    pub fn af(&self) -> &af::Array<u64> {
-        &self.array
-    }
-
-    /// Borrow these `Coords` mutably as an `af::Array<u64>`.
-    #[inline]
-    pub fn af_mut(&mut self) -> &mut af::Array<u64> {
-        &mut self.array
-    }
-
     /// Return `true` if the number of coordinates in these `Coords` is zero.
     pub fn is_empty(&self) -> bool {
         self.array.elements() == 0
@@ -156,7 +145,7 @@ impl Coords {
 
     /// Return the number of coordinates stored in these `Coords`.
     pub fn len(&self) -> usize {
-        self.af().dims()[1] as usize
+        self.dims()[1] as usize
     }
 
     /// Return the number of dimensions of these `Coords`.
@@ -168,7 +157,7 @@ impl Coords {
         let i = (self.len() - 1) as f32;
         let dim0 = af::Seq::new(0., (self.ndim - 1) as f32, 1.);
         let dim1 = af::Seq::new(i, i, 1.);
-        let slice = af::index(self.af(), &[dim0, dim1]);
+        let slice = af::index(self, &[dim0, dim1]);
         let mut first = vec![0; self.ndim];
         slice.host(&mut first);
         first
@@ -177,7 +166,7 @@ impl Coords {
     fn append(&self, other: &Coords) -> Self {
         assert_eq!(self.ndim, other.ndim);
 
-        let array = af::join(1, self.af(), other.af());
+        let array = af::join(1, self, other);
         Self {
             array,
             ndim: self.ndim,
@@ -194,8 +183,8 @@ impl Coords {
         let left = af::Seq::new(0., (at - 1) as f32, 1.);
         let right = af::Seq::new(at as f32, (self.len() - 1) as f32, 1.);
 
-        let left = af::index(self.af(), &[af::Seq::default(), left]);
-        let right = af::index(self.af(), &[af::Seq::default(), right]);
+        let left = af::index(self, &[af::Seq::default(), left]);
+        let right = af::index(self, &[af::Seq::default(), right]);
         (
             Self {
                 array: left,
@@ -216,13 +205,13 @@ impl Coords {
         let pivot = coord_to_offset(lt, &coord_bounds);
         let pivot = af::Array::new(&[pivot], dim4(1));
         let offsets = self.to_offsets(shape);
-        let left = af::lt(offsets.af(), &pivot, true);
+        let left = af::lt(offsets.deref(), &pivot, true);
         let (pivot, _) = af::sum_all(&left);
         self.split(pivot as usize)
     }
 
     fn sorted(&self) -> Self {
-        let array = af::sort(self.af(), 2, true);
+        let array = af::sort(self, 2, true);
         Self {
             array,
             ndim: self.ndim,
@@ -231,7 +220,7 @@ impl Coords {
 
     fn unique(&self, shape: &[u64]) -> Self {
         let offsets = self.to_offsets(shape);
-        let offsets = af::set_unique(offsets.af(), true);
+        let offsets = af::set_unique(offsets.deref(), true);
         Self::from_offsets(offsets.into(), shape)
     }
 
@@ -254,7 +243,7 @@ impl Coords {
         assert!(axis <= self.ndim);
 
         let ndim = self.ndim + 1;
-        let dims = af::Dim4::new(&[ndim as u64, self.af().dims()[1], 1, 1]);
+        let dims = af::Dim4::new(&[ndim as u64, self.dims()[1], 1, 1]);
         let mut expanded = af::constant(0, dims);
 
         let index: Vec<u64> = (0..self.ndim())
@@ -262,7 +251,7 @@ impl Coords {
             .map(|x| x as u64)
             .collect();
 
-        index_set(&mut expanded, &index, self.af());
+        index_set(&mut expanded, &index, self);
 
         Self {
             array: expanded,
@@ -291,7 +280,7 @@ impl Coords {
         }
 
         let offsets = af::Array::new(&offsets, dim4(offsets.len()));
-        let array = af::sub(self.get(&index).af(), &offsets, true);
+        let array = af::sub(self.get(&index).deref(), &offsets, true);
         Self { array, ndim }
     }
 
@@ -365,7 +354,7 @@ impl Coords {
         let unsliced = af::Array::new(&unsliced, dim4(ndim));
         let tile_dims = af::Dim4::new(&[1, self.len() as u64, 1, 1]);
         let mut unsliced = af::tile(&unsliced, tile_dims);
-        index_set(&mut unsliced, &axes, self.af());
+        index_set(&mut unsliced, &axes, self);
 
         let offsets = af::Array::new(&offsets, dim4(ndim));
         let offsets = af::tile(&offsets, tile_dims);
@@ -388,7 +377,7 @@ impl Coords {
             })
             .collect();
 
-        let array = index_get(self.af(), &axes);
+        let array = index_get(self, &axes);
         Self {
             array,
             ndim: axes.len(),
@@ -407,7 +396,7 @@ impl Coords {
             })
             .collect();
 
-        index_set(self.af_mut(), &axes, value.af())
+        index_set(self, &axes, value)
     }
 
     /// Return these `Coords` as [`Offsets`] with respect to the given shape.
@@ -445,6 +434,14 @@ impl Coords {
     /// Panics: if the given number of dimensions does not fit the set of coordinates.
     pub fn into_vec(self) -> Vec<Vec<u64>> {
         self.to_vec()
+    }
+}
+
+impl Deref for Coords {
+    type Target = af::Array<u64>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.array
     }
 }
 
