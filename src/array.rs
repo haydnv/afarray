@@ -76,7 +76,7 @@ impl Array {
             (l, r) if l.dtype() > r.dtype() => Array::concatenate(l, &r.cast_into(l.dtype())),
             (l, r) if l.dtype() < r.dtype() => Array::concatenate(&l.cast_into(r.dtype()), r),
 
-            _ => unreachable!(),
+            (l, r) => unreachable!("concatenate {}, {}", l, r),
         }
     }
 
@@ -119,13 +119,13 @@ impl Array {
         match self {
             Bool(_) => NumberType::Bool,
             C32(_) => ComplexType::C32.into(),
-            C64(_) => ComplexType::C32.into(),
+            C64(_) => ComplexType::C64.into(),
             F32(_) => FloatType::F32.into(),
             F64(_) => FloatType::F64.into(),
             I16(_) => IntType::I16.into(),
             I32(_) => IntType::I32.into(),
             I64(_) => IntType::I64.into(),
-            U8(_) => UIntType::U16.into(),
+            U8(_) => UIntType::U8.into(),
             U16(_) => UIntType::U16.into(),
             U32(_) => UIntType::U32.into(),
             U64(_) => UIntType::U64.into(),
@@ -1778,6 +1778,12 @@ mod tests {
 
         let b: Array = [-1., -4., 4.][..].into();
         assert_eq!(&a / &b, [-1., -0.5, 0.75][..].into());
+    }
+
+    #[test]
+    fn test_exp() {
+        let a: ArrayExt<f32> = [0.5, 1.0, 1.5, 2.0][..].into();
+        a.exp();
     }
 
     #[test]
