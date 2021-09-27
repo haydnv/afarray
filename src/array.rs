@@ -249,6 +249,13 @@ impl Array {
         Array::Bool(this.and(&that))
     }
 
+    /// Element-wise logical and, relative to a constant `other`.
+    pub fn and_const(&self, other: Number) -> Array {
+        let this: ArrayExt<bool> = self.type_cast();
+        let that: ArrayExt<bool> = ArrayExt::from(&[other.cast_into()][..]);
+        Array::Bool(this.and(&that))
+    }
+
     /// Element-wise equality comparison.
     pub fn eq(&self, other: &Array) -> Array {
         use Array::*;
@@ -629,6 +636,13 @@ impl Array {
     pub fn or(&self, other: &Array) -> Array {
         let this: ArrayExt<bool> = self.type_cast();
         let that: ArrayExt<bool> = other.type_cast();
+        Array::Bool(this.or(&that))
+    }
+
+    /// Element-wise logical or, relative to a constant `other`.
+    pub fn or_const(&self, other: Number) -> Array {
+        let this: ArrayExt<bool> = self.type_cast();
+        let that: ArrayExt<bool> = ArrayExt::from(&[other.cast_into()][..]);
         Array::Bool(this.or(&that))
     }
 
