@@ -1781,12 +1781,6 @@ mod tests {
     }
 
     #[test]
-    fn test_exp() {
-        let a: ArrayExt<f32> = [0.5, 1.0, 1.5, 2.0][..].into();
-        a.exp();
-    }
-
-    #[test]
     fn test_pow() {
         let a: Array = [1, 2, 3][..].into();
         let b: Array = [2][..].into();
