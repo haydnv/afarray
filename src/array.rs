@@ -996,6 +996,13 @@ impl Array {
         let that: ArrayExt<bool> = other.type_cast();
         Array::Bool(this.xor(&that))
     }
+
+    /// Element-wise logical xor, relative to a constant `other`.
+    pub fn xor_const(&self, other: Number) -> Array {
+        let this: ArrayExt<bool> = self.type_cast();
+        let that: ArrayExt<bool> = ArrayExt::from(&[other.cast_into()][..]);
+        Array::Bool(this.xor(&that))
+    }
 }
 
 impl PartialEq for Array {
