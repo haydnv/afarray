@@ -1761,6 +1761,13 @@ mod tests {
     }
 
     #[test]
+    fn test_mul_const() {
+        let a: Array = [1, 2, 3][..].into();
+        let b: Number = 2f32.into();
+        assert_eq!(&a * b, [2.0, 4.0, 6.0][..].into());
+    }
+
+    #[test]
     fn test_mul_float() {
         let a: Array = [1, 2, 3][..].into();
         let b: Array = [2.0][..].into();

@@ -36,10 +36,12 @@ use std::fmt;
 pub use array::*;
 pub use coords::*;
 pub use ext::*;
+pub use stream::*;
 
 mod array;
 mod coords;
 mod ext;
+mod stream;
 
 pub type Complex<T> = num_complex::Complex<T>;
 
