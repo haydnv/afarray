@@ -12,6 +12,42 @@ use serde::ser::{Serialize, Serializer};
 
 use super::{dim4, Complex};
 
+/// Convenience methods defining the base value of a reduce operation on an `ArrayExt`.
+pub trait HasArrayExt {
+    /// The base value of a `product` operation.
+    fn one() -> Self;
+
+    /// The base value of a `sum` operation.
+    fn zero() -> Self;
+}
+
+macro_rules! has_array_ext {
+    ($t:ty,$one:expr,$zero:expr) => {
+        impl HasArrayExt for $t {
+            fn one() -> Self {
+                $one
+            }
+
+            fn zero() -> Self {
+                $zero
+            }
+        }
+    };
+}
+
+has_array_ext!(bool, true, false);
+has_array_ext!(u8, 0, 1);
+has_array_ext!(u16, 0, 1);
+has_array_ext!(u32, 0, 1);
+has_array_ext!(u64, 0, 1);
+has_array_ext!(i16, 0, 1);
+has_array_ext!(i32, 0, 1);
+has_array_ext!(i64, 0, 1);
+has_array_ext!(f32, 0., 1.);
+has_array_ext!(f64, 0., 1.);
+has_array_ext!(Complex<f32>, Complex::new(0., 0.), Complex::new(1., 1.));
+has_array_ext!(Complex<f64>, Complex::new(0., 0.), Complex::new(1., 1.));
+
 /// Defines common access methods for instance of [`ArrayExt`].
 pub trait ArrayInstance: Deref<Target = af::Array<Self::DType>> + DerefMut {
     type DType: af::HasAfEnum;
