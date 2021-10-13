@@ -417,7 +417,7 @@ impl Coords {
     /// Return a list of [`Coord`]s from these `Coords`.
     ///
     /// Panics: if the given number of dimensions does not fit the set of coordinates
-    pub fn to_vec(&self) -> Vec<Vec<u64>> {
+    pub fn to_vec(&self) -> Vec<Coord> {
         assert_eq!(self.array.elements() % self.ndim, 0);
 
         let mut to_vec = vec![0u64; self.array.elements()];
@@ -432,7 +432,7 @@ impl Coords {
     /// Convert these `Coords` into a list of [`Coord`]s.
     ///
     /// Panics: if the given number of dimensions does not fit the set of coordinates.
-    pub fn into_vec(self) -> Vec<Vec<u64>> {
+    pub fn into_vec(self) -> Vec<Coord> {
         self.to_vec()
     }
 }
