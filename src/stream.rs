@@ -4,25 +4,38 @@ use std::task::{Context, Poll};
 
 use arrayfire as af;
 use futures::ready;
-use futures::stream::{self, Fuse, Stream, StreamExt};
+use futures::stream::{self, Fuse, Stream, StreamExt, TryStreamExt};
 use pin_project::pin_project;
 
-use crate::{ArrayExt, ArrayInstance};
+use crate::{ArrayExt, ArrayInstance, ArrayInstanceReduce};
 
 pub trait ArrayTryStream<'a, T, E>
 where
-    T: af::HasAfEnum + Default + Send + 'a,
+    T: af::HasAfEnum<AggregateOutType = T> + Default + Send + 'a,
+    T::BaseType: af::Fromf64,
     E: Send + 'a,
+    ArrayExt<T>: ArrayInstanceReduce<Sum = T>,
     Self: Stream<Item = Result<ArrayExt<T>, E>> + Sized + Send + Unpin + 'a,
 {
     fn reduce_sum(
         self,
         block_size: usize,
         stride: u64,
-    ) -> Box<dyn Stream<Item = Result<ArrayExt<T>, E>> + Send + Unpin + 'a> {
+    ) -> Box<dyn Stream<Item = Result<ArrayExt<T::AggregateOutType>, E>> + Send + Unpin + 'a> {
         if stride < (block_size / 2) as u64 {
-            let reduced = reduce_small(self.resize(block_size - (block_size % stride as usize)));
-            Box::new(reduced.resize(block_size))
+            if block_size as u64 % stride == 0 {
+                let per_block = block_size as u64 / stride;
+                debug_assert_eq!(per_block % stride, 0);
+                let reduced = reduce_small(self, per_block, stride);
+                Box::new(reduced.resize(block_size))
+            } else {
+                let reduce_block_size = block_size - (block_size % stride as usize);
+                let blocks = self.resize(reduce_block_size);
+                let per_block = reduce_block_size as u64 / stride;
+                debug_assert_eq!(per_block % stride, 0);
+                let reduced = reduce_small(blocks, per_block, stride);
+                Box::new(reduced.resize(block_size))
+            }
         } else if stride < block_size as u64 {
             let reduced = reduce_medium(self.resize(stride as usize));
             Box::new(Aggregate::new(reduced, block_size))
@@ -42,28 +55,42 @@ where
 
 impl<'a, T, E, S> ArrayTryStream<'a, T, E> for S
 where
-    T: af::HasAfEnum + Default + Send + 'a,
+    T: af::HasAfEnum<AggregateOutType = T> + Default + Send + 'a,
+    T::BaseType: af::Fromf64,
     E: Send + 'a,
     S: Stream<Item = Result<ArrayExt<T>, E>> + Sized + Send + Unpin + 'a,
+    ArrayExt<T>: ArrayInstanceReduce<Sum = T>,
 {
 }
 
 fn reduce_small<T: af::HasAfEnum, E, S: Stream<Item = Result<ArrayExt<T>, E>>>(
-    _blocks: S,
-) -> impl Stream<Item = Result<ArrayExt<T>, E>> {
-    stream::empty() // TODO
+    blocks: S,
+    per_block: u64,
+    stride: u64,
+) -> impl Stream<Item = Result<ArrayExt<T::AggregateOutType>, E>> {
+    let shape = af::Dim4::new(&[per_block, stride, 0, 0]);
+    blocks
+        .map_ok(move |block| af::moddims(&block, shape.clone()))
+        .map_ok(|block| af::sum(&block, 1))
+        .map_ok(ArrayExt::from)
 }
 
 fn reduce_medium<T: af::HasAfEnum, E, S: Stream<Item = Result<ArrayExt<T>, E>>>(
-    _blocks: S,
-) -> impl Stream<Item = Result<T, E>> {
-    stream::empty() // TODO
+    blocks: S,
+) -> impl Stream<Item = Result<T, E>>
+where
+    T: af::HasAfEnum<AggregateOutType = T>,
+    T::BaseType: af::Fromf64,
+    S: Stream<Item = Result<ArrayExt<T>, E>>,
+    ArrayExt<T>: ArrayInstanceReduce<Sum = T>,
+{
+    blocks.map_ok(|block| ArrayInstanceReduce::sum(&block))
 }
 
 fn reduce_large<T: af::HasAfEnum, E, S: Stream<Item = Result<ArrayExt<T>, E>>>(
     _blocks: S,
     _stride: u64,
-) -> impl Stream<Item = Result<T, E>> {
+) -> impl Stream<Item = Result<T::AggregateOutType, E>> {
     stream::empty() // TODO
 }
 
