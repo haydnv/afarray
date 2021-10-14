@@ -15,6 +15,74 @@ use serde::ser::{Serialize, Serializer};
 use super::ext::*;
 use super::{error, Complex, Result};
 
+/// The [`NumberType`] of the product of an [`Array`] with the given `array_dtype`.
+pub fn product_dtype(array_dtype: NumberType) -> NumberType {
+    use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
+
+    match array_dtype {
+        NT::Bool => ArrayExt::<bool>::product_dtype(),
+        NT::Complex(ct) => match ct {
+            CT::C32 => ArrayExt::<Complex<f32>>::product_dtype(),
+            CT::C64 => ArrayExt::<Complex<f64>>::product_dtype(),
+            CT::Complex => ArrayExt::<Complex<f64>>::product_dtype(),
+        },
+        NT::Float(ft) => match ft {
+            FT::F32 => ArrayExt::<f32>::product_dtype(),
+            FT::F64 => ArrayExt::<f64>::product_dtype(),
+            FT::Float => ArrayExt::<f64>::product_dtype(),
+        },
+        NT::Int(it) => match it {
+            IT::I8 => ArrayExt::<i16>::product_dtype(),
+            IT::I16 => ArrayExt::<i16>::product_dtype(),
+            IT::I32 => ArrayExt::<i32>::product_dtype(),
+            IT::I64 => ArrayExt::<i64>::product_dtype(),
+            IT::Int => ArrayExt::<i64>::product_dtype(),
+        },
+        NT::UInt(ut) => match ut {
+            UT::U8 => ArrayExt::<u8>::product_dtype(),
+            UT::U16 => ArrayExt::<u16>::product_dtype(),
+            UT::U32 => ArrayExt::<u32>::product_dtype(),
+            UT::U64 => ArrayExt::<u64>::product_dtype(),
+            UT::UInt => ArrayExt::<u64>::product_dtype(),
+        },
+        NT::Number => ArrayExt::<f64>::product_dtype(),
+    }
+}
+
+/// The [`NumberType`] of the sum of an [`Array`] with the given `array_dtype`.
+pub fn sum_dtype(array_dtype: NumberType) -> NumberType {
+    use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
+
+    match array_dtype {
+        NT::Bool => ArrayExt::<bool>::sum_dtype(),
+        NT::Complex(ct) => match ct {
+            CT::C32 => ArrayExt::<Complex<f32>>::sum_dtype(),
+            CT::C64 => ArrayExt::<Complex<f64>>::sum_dtype(),
+            CT::Complex => ArrayExt::<Complex<f64>>::sum_dtype(),
+        },
+        NT::Float(ft) => match ft {
+            FT::F32 => ArrayExt::<f32>::sum_dtype(),
+            FT::F64 => ArrayExt::<f64>::sum_dtype(),
+            FT::Float => ArrayExt::<f64>::sum_dtype(),
+        },
+        NT::Int(it) => match it {
+            IT::I8 => ArrayExt::<i16>::sum_dtype(),
+            IT::I16 => ArrayExt::<i16>::sum_dtype(),
+            IT::I32 => ArrayExt::<i32>::sum_dtype(),
+            IT::I64 => ArrayExt::<i64>::sum_dtype(),
+            IT::Int => ArrayExt::<i64>::sum_dtype(),
+        },
+        NT::UInt(ut) => match ut {
+            UT::U8 => ArrayExt::<u8>::sum_dtype(),
+            UT::U16 => ArrayExt::<u16>::sum_dtype(),
+            UT::U32 => ArrayExt::<u32>::sum_dtype(),
+            UT::U64 => ArrayExt::<u64>::sum_dtype(),
+            UT::UInt => ArrayExt::<u64>::sum_dtype(),
+        },
+        NT::Number => ArrayExt::<f64>::sum_dtype(),
+    }
+}
+
 /// A generic one-dimensional array which supports all variants of [`NumberType`].
 #[derive(Clone)]
 pub enum Array {
@@ -134,51 +202,9 @@ impl Array {
         }
     }
 
-    /// The [`NumberType`] of this `Array`'s product.
-    pub fn product_dtype(&self) -> NumberType {
-        use Array::*;
-        match self {
-            Bool(_) => ArrayExt::<bool>::product_dtype(),
-            C32(_) => ArrayExt::<Complex<f32>>::product_dtype(),
-            C64(_) => ArrayExt::<Complex<f64>>::product_dtype(),
-            F32(_) => ArrayExt::<f32>::product_dtype(),
-            F64(_) => ArrayExt::<f64>::product_dtype(),
-            I16(_) => ArrayExt::<i16>::product_dtype(),
-            I32(_) => ArrayExt::<i32>::product_dtype(),
-            I64(_) => ArrayExt::<i64>::product_dtype(),
-            U8(_) => ArrayExt::<u8>::product_dtype(),
-            U16(_) => ArrayExt::<u16>::product_dtype(),
-            U32(_) => ArrayExt::<u32>::product_dtype(),
-            U64(_) => ArrayExt::<u64>::product_dtype(),
-        }
-    }
-
-    /// The [`NumberType`] of this `Array`'s product.
-    pub fn sum_dtype(&self) -> NumberType {
-        use Array::*;
-        match self {
-            Bool(_) => ArrayExt::<bool>::sum_dtype(),
-            C32(_) => ArrayExt::<Complex<f32>>::sum_dtype(),
-            C64(_) => ArrayExt::<Complex<f64>>::sum_dtype(),
-            F32(_) => ArrayExt::<f32>::sum_dtype(),
-            F64(_) => ArrayExt::<f64>::sum_dtype(),
-            I16(_) => ArrayExt::<i16>::sum_dtype(),
-            I32(_) => ArrayExt::<i32>::sum_dtype(),
-            I64(_) => ArrayExt::<i64>::sum_dtype(),
-            U8(_) => ArrayExt::<u8>::sum_dtype(),
-            U16(_) => ArrayExt::<u16>::sum_dtype(),
-            U32(_) => ArrayExt::<u32>::sum_dtype(),
-            U64(_) => ArrayExt::<u64>::sum_dtype(),
-        }
-    }
-
     /// Cast into an `Array` of a different `NumberType`.
     pub fn cast_into(&self, dtype: NumberType) -> Array {
-        use ComplexType as CT;
-        use FloatType as FT;
-        use IntType as IT;
-        use NumberType as NT;
-        use UIntType as UT;
+        use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
 
         match dtype {
             NT::Bool => Self::Bool(self.type_cast()),
@@ -1467,11 +1493,7 @@ where
 
 impl From<Vec<Number>> for Array {
     fn from(elements: Vec<Number>) -> Self {
-        use ComplexType as CT;
-        use FloatType as FT;
-        use IntType as IT;
-        use NumberType as NT;
-        use UIntType as UT;
+        use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
 
         let dtype = elements.iter().map(|n| n.class()).fold(NT::Bool, Ord::max);
 

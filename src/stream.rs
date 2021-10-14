@@ -22,11 +22,7 @@ where
     E: Send + 'a,
     S: Stream<Item = Result<Array, E>> + Send + Unpin + 'a,
 {
-    use ComplexType as CT;
-    use FloatType as FT;
-    use IntType as IT;
-    use NumberType as NT;
-    use UIntType as UT;
+    use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
 
     match dtype {
         NT::Bool => reduce_product_inner::<bool, E, S>(blocks, block_size, stride),
@@ -87,11 +83,7 @@ where
     E: Send + 'a,
     S: Stream<Item = Result<Array, E>> + Send + Unpin + 'a,
 {
-    use ComplexType as CT;
-    use FloatType as FT;
-    use IntType as IT;
-    use NumberType as NT;
-    use UIntType as UT;
+    use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
 
     match dtype {
         NT::Bool => reduce_sum_inner::<bool, E, S>(blocks, block_size, stride),
