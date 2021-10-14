@@ -45,6 +45,70 @@ mod stream;
 
 pub type Complex<T> = num_complex::Complex<T>;
 
+pub trait Sum {
+    fn sum(self, other: Self) -> Self;
+}
+
+impl Sum for bool {
+    fn sum(self, other: Self) -> Self {
+        self || other
+    }
+}
+
+macro_rules! sum {
+    ($t:ty) => {
+        impl Sum for $t {
+            fn sum(self, other: Self) -> Self {
+                self + other
+            }
+        }
+    };
+}
+
+sum!(u8);
+sum!(u16);
+sum!(u32);
+sum!(u64);
+sum!(i16);
+sum!(i32);
+sum!(i64);
+sum!(f32);
+sum!(f64);
+sum!(Complex<f32>);
+sum!(Complex<f64>);
+
+pub trait Product {
+    fn product(self, other: Self) -> Self;
+}
+
+impl Product for bool {
+    fn product(self, other: Self) -> Self {
+        self && other
+    }
+}
+
+macro_rules! product {
+    ($t:ty) => {
+        impl Product for $t {
+            fn product(self, other: Self) -> Self {
+                self * other
+            }
+        }
+    };
+}
+
+product!(u8);
+product!(u16);
+product!(u32);
+product!(u64);
+product!(i16);
+product!(i32);
+product!(i64);
+product!(f32);
+product!(f64);
+product!(Complex<f32>);
+product!(Complex<f64>);
+
 /// The error type used for Array which may fail recoverably.
 pub struct ArrayError {
     message: String,

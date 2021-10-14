@@ -7,35 +7,39 @@ use arrayfire as af;
 use async_trait::async_trait;
 use destream::{de, en};
 use futures::{future, stream, Stream};
+use number_general::{DType, NumberType};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
 use super::{dim4, Complex};
 
 /// Convenience methods defining the base value of a reduce operation on an `ArrayExt`.
-pub trait HasArrayExt {
+pub trait HasArrayExt
+where
+    Self: af::HasAfEnum,
+{
     /// The base value of a `product` operation.
-    fn one() -> Self;
+    fn one() -> <Self as af::HasAfEnum>::ProductOutType;
 
     /// The base value of a `sum` operation.
-    fn zero() -> Self;
+    fn zero() -> <Self as af::HasAfEnum>::AggregateOutType;
 }
 
 macro_rules! has_array_ext {
     ($t:ty,$one:expr,$zero:expr) => {
         impl HasArrayExt for $t {
-            fn one() -> Self {
+            fn one() -> <Self as af::HasAfEnum>::ProductOutType {
                 $one
             }
 
-            fn zero() -> Self {
+            fn zero() -> <Self as af::HasAfEnum>::AggregateOutType {
                 $zero
             }
         }
     };
 }
 
-has_array_ext!(bool, true, false);
+has_array_ext!(bool, true, 0);
 has_array_ext!(u8, 0, 1);
 has_array_ext!(u16, 0, 1);
 has_array_ext!(u32, 0, 1);
@@ -693,176 +697,81 @@ where
 }
 
 /// Defines common reduction operations `product` and `sum`.
-pub trait ArrayInstanceReduce: ArrayInstance {
+pub trait ArrayInstanceReduce<T>: ArrayInstance
+where
+    T: af::HasAfEnum,
+    T::AggregateOutType: DType,
+    T::ProductOutType: DType,
+{
     type Product: af::HasAfEnum;
     type Sum: af::HasAfEnum;
 
     /// Calculate the cumulative product.
-    fn product(&self) -> Self::Product;
+    fn product(&self) -> T::ProductOutType;
+
+    /// The `NumberType` of the product of this array.
+    fn product_dtype() -> NumberType {
+        T::ProductOutType::dtype()
+    }
 
     /// Calculate the cumulative sum.
-    fn sum(&self) -> Self::Sum;
-}
+    fn sum(&self) -> T::AggregateOutType;
 
-impl ArrayInstanceReduce for ArrayExt<bool> {
-    type Product = u64;
-    type Sum = u64;
-
-    fn product(&self) -> u64 {
-        af::product_all(self).0 as u64
-    }
-
-    fn sum(&self) -> u64 {
-        af::sum_all(self).0 as u64
+    /// The `NumberType` of the sum of this array.
+    fn sum_dtype() -> NumberType {
+        T::AggregateOutType::dtype()
     }
 }
 
-impl ArrayInstanceReduce for ArrayExt<Complex<f32>> {
-    type Product = Complex<f32>;
-    type Sum = Complex<f32>;
+macro_rules! reduce_real {
+    ($t:ty) => {
+        impl ArrayInstanceReduce<$t> for ArrayExt<$t> {
+            type Product = <$t as af::HasAfEnum>::ProductOutType;
+            type Sum = <$t as af::HasAfEnum>::AggregateOutType;
 
-    fn product(&self) -> Self::Product {
-        let product = af::product_all(self);
-        Complex::new(product.0, product.1)
-    }
+            fn product(&self) -> Self::Product {
+                af::product_all(self).0
+            }
 
-    fn sum(&self) -> Self::Sum {
-        let sum = af::sum_all(self);
-        Complex::new(sum.0, sum.1)
-    }
+            fn sum(&self) -> Self::Sum {
+                af::sum_all(self).0
+            }
+        }
+    };
 }
 
-impl ArrayInstanceReduce for ArrayExt<Complex<f64>> {
-    type Product = Complex<f64>;
-    type Sum = Complex<f64>;
+reduce_real!(bool);
+reduce_real!(u8);
+reduce_real!(u16);
+reduce_real!(u32);
+reduce_real!(u64);
+reduce_real!(i16);
+reduce_real!(i32);
+reduce_real!(i64);
+reduce_real!(f32);
+reduce_real!(f64);
 
-    fn product(&self) -> Self::Product {
-        let product = af::product_all(self);
-        Complex::new(product.0, product.1)
-    }
+macro_rules! reduce_complex {
+    ($t:ty) => {
+        impl ArrayInstanceReduce<Complex<$t>> for ArrayExt<Complex<$t>> {
+            type Product = Complex<$t>;
+            type Sum = Complex<$t>;
 
-    fn sum(&self) -> Self::Sum {
-        let sum = af::sum_all(self);
-        Complex::new(sum.0, sum.1)
-    }
+            fn product(&self) -> Self::Product {
+                let product = af::product_all(self);
+                Complex::new(product.0, product.1)
+            }
+
+            fn sum(&self) -> Self::Sum {
+                let sum = af::sum_all(self);
+                Complex::new(sum.0, sum.1)
+            }
+        }
+    };
 }
 
-impl ArrayInstanceReduce for ArrayExt<f32> {
-    type Product = f32;
-    type Sum = f32;
-
-    fn product(&self) -> f32 {
-        af::product_all(self).0
-    }
-
-    fn sum(&self) -> f32 {
-        af::sum_all(self).0
-    }
-}
-
-impl ArrayInstanceReduce for ArrayExt<f64> {
-    type Product = f64;
-    type Sum = f64;
-
-    fn product(&self) -> f64 {
-        af::product_all(self).0
-    }
-
-    fn sum(&self) -> f64 {
-        af::sum_all(self).0
-    }
-}
-
-impl ArrayInstanceReduce for ArrayExt<i16> {
-    type Product = i64;
-    type Sum = i64;
-
-    fn product(&self) -> i64 {
-        af::product_all(self).0 as i64
-    }
-
-    fn sum(&self) -> i64 {
-        af::sum_all(self).0 as i64
-    }
-}
-
-impl ArrayInstanceReduce for ArrayExt<i32> {
-    type Product = i64;
-    type Sum = i64;
-
-    fn product(&self) -> i64 {
-        af::product_all(self).0 as i64
-    }
-
-    fn sum(&self) -> i64 {
-        af::sum_all(self).0 as i64
-    }
-}
-
-impl ArrayInstanceReduce for ArrayExt<i64> {
-    type Product = i64;
-    type Sum = i64;
-
-    fn product(&self) -> i64 {
-        af::product_all(self).0 as i64
-    }
-
-    fn sum(&self) -> i64 {
-        af::sum_all(self).0 as i64
-    }
-}
-
-impl ArrayInstanceReduce for ArrayExt<u8> {
-    type Product = u64;
-    type Sum = u64;
-
-    fn product(&self) -> u64 {
-        af::product_all(self).0 as u64
-    }
-
-    fn sum(&self) -> u64 {
-        af::sum_all(self).0 as u64
-    }
-}
-
-impl ArrayInstanceReduce for ArrayExt<u16> {
-    type Product = u64;
-    type Sum = u64;
-
-    fn product(&self) -> u64 {
-        af::product_all(self).0 as u64
-    }
-
-    fn sum(&self) -> u64 {
-        af::sum_all(self).0 as u64
-    }
-}
-
-impl ArrayInstanceReduce for ArrayExt<u32> {
-    type Product = u64;
-    type Sum = u64;
-
-    fn product(&self) -> u64 {
-        af::product_all(self).0 as u64
-    }
-
-    fn sum(&self) -> u64 {
-        af::sum_all(self).0 as u64
-    }
-}
-
-impl ArrayInstanceReduce for ArrayExt<u64> {
-    type Product = u64;
-    type Sum = u64;
-
-    fn product(&self) -> u64 {
-        af::product_all(self).0 as u64
-    }
-
-    fn sum(&self) -> u64 {
-        af::sum_all(self).0 as u64
-    }
-}
+reduce_complex!(f32);
+reduce_complex!(f64);
 
 impl<'de, T: af::HasAfEnum + Deserialize<'de> + 'de> Deserialize<'de> for ArrayExt<T>
 where

@@ -115,20 +115,60 @@ impl Array {
 
     /// The [`NumberType`] of this `Array`.
     pub fn dtype(&self) -> NumberType {
+        use number_general::DType;
+        use Array::*;
+
+        match self {
+            Bool(_) => bool::dtype(),
+            C32(_) => Complex::<f32>::dtype(),
+            C64(_) => Complex::<f64>::dtype(),
+            F32(_) => f32::dtype(),
+            F64(_) => f64::dtype(),
+            I16(_) => i16::dtype(),
+            I32(_) => i32::dtype(),
+            I64(_) => i64::dtype(),
+            U8(_) => u64::dtype(),
+            U16(_) => u64::dtype(),
+            U32(_) => u64::dtype(),
+            U64(_) => u64::dtype(),
+        }
+    }
+
+    /// The [`NumberType`] of this `Array`'s product.
+    pub fn product_dtype(&self) -> NumberType {
         use Array::*;
         match self {
-            Bool(_) => NumberType::Bool,
-            C32(_) => ComplexType::C32.into(),
-            C64(_) => ComplexType::C64.into(),
-            F32(_) => FloatType::F32.into(),
-            F64(_) => FloatType::F64.into(),
-            I16(_) => IntType::I16.into(),
-            I32(_) => IntType::I32.into(),
-            I64(_) => IntType::I64.into(),
-            U8(_) => UIntType::U8.into(),
-            U16(_) => UIntType::U16.into(),
-            U32(_) => UIntType::U32.into(),
-            U64(_) => UIntType::U64.into(),
+            Bool(_) => ArrayExt::<bool>::product_dtype(),
+            C32(_) => ArrayExt::<Complex<f32>>::product_dtype(),
+            C64(_) => ArrayExt::<Complex<f64>>::product_dtype(),
+            F32(_) => ArrayExt::<f32>::product_dtype(),
+            F64(_) => ArrayExt::<f64>::product_dtype(),
+            I16(_) => ArrayExt::<i16>::product_dtype(),
+            I32(_) => ArrayExt::<i32>::product_dtype(),
+            I64(_) => ArrayExt::<i64>::product_dtype(),
+            U8(_) => ArrayExt::<u8>::product_dtype(),
+            U16(_) => ArrayExt::<u16>::product_dtype(),
+            U32(_) => ArrayExt::<u32>::product_dtype(),
+            U64(_) => ArrayExt::<u64>::product_dtype(),
+        }
+    }
+
+    /// The [`NumberType`] of this `Array`'s product.
+    pub fn sum_dtype(&self) -> NumberType {
+        use Array::*;
+        match self {
+            Bool(_) => ArrayExt::<bool>::sum_dtype(),
+            C32(_) => ArrayExt::<Complex<f32>>::sum_dtype(),
+            C64(_) => ArrayExt::<Complex<f64>>::sum_dtype(),
+            F32(_) => ArrayExt::<f32>::sum_dtype(),
+            F64(_) => ArrayExt::<f64>::sum_dtype(),
+            I16(_) => ArrayExt::<i16>::sum_dtype(),
+            I32(_) => ArrayExt::<i32>::sum_dtype(),
+            I64(_) => ArrayExt::<i64>::sum_dtype(),
+            U8(_) => ArrayExt::<u8>::sum_dtype(),
+            U16(_) => ArrayExt::<u16>::sum_dtype(),
+            U32(_) => ArrayExt::<u32>::sum_dtype(),
+            U64(_) => ArrayExt::<u64>::sum_dtype(),
         }
     }
 
@@ -650,7 +690,7 @@ impl Array {
     pub fn product(&self) -> Number {
         use Array::*;
         match self {
-            Bool(b) => Number::UInt(b.product().into()),
+            Bool(b) => Number::Bool(b.product().into()),
             C32(c) => Number::Complex(c.product().into()),
             C64(c) => Number::Complex(c.product().into()),
             F32(f) => Number::Float(f.product().into()),
