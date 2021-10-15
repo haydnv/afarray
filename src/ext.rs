@@ -602,6 +602,7 @@ impl ArrayInstanceAnyAll for ArrayExt<Complex<f64>> {
     }
 }
 
+/// Methods to check for infinite or non-numeric array elements.
 pub trait ArrayInstanceUnreal {
     /// Element-wise check for infinite values.
     fn is_infinite(&self) -> ArrayExt<bool>;

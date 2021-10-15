@@ -12,6 +12,7 @@ use crate::{
     Array, ArrayExt, ArrayInstance, ArrayInstanceReduce, Complex, HasArrayExt, Product, Sum,
 };
 
+/// Compute the product of each `stride` of a [`Stream`] of [`Array`]s.
 pub fn reduce_product<'a, E, S>(
     blocks: S,
     dtype: NumberType,
@@ -73,6 +74,7 @@ where
     Box::new(reduced.map_ok(Array::from))
 }
 
+/// Compute the sum of each `stride` of a [`Stream`] of [`Array`]s.
 pub fn reduce_sum<'a, E, S>(
     blocks: S,
     dtype: NumberType,
@@ -134,6 +136,7 @@ where
     Box::new(reduced.map_ok(Array::from))
 }
 
+/// Methods for handling a [`Stream`] of [`ArrayExt`]s.
 pub trait ArrayTryStream<'a, T, E>
 where
     T: af::HasAfEnum + HasArrayExt + Copy + Default + Send + 'a,
@@ -143,6 +146,7 @@ where
     Self: Stream<Item = Result<ArrayExt<T>, E>> + Sized + Send + Unpin + 'a,
     ArrayExt<T>: ArrayInstanceReduce<T> + From<af::Array<T>>,
 {
+    /// Compute the product of each `stride` of a [`Stream`] of [`ArrayExt`]s.
     fn reduce_product(
         self,
         block_size: usize,
@@ -154,11 +158,12 @@ where
             stride,
             T::one(),
             Product::product,
-            |block| af::product(&block, 1).into(),
+            |block| af::product(&block, 0).into(),
             |block| block.product(),
         )
     }
 
+    /// Compute the sum of each `stride` of a [`Stream`] of [`ArrayExt`]s.
     fn reduce_sum(
         self,
         block_size: usize,
@@ -170,11 +175,12 @@ where
             stride,
             T::zero(),
             Sum::sum,
-            |block| af::sum(&block, 1).into(),
+            |block| af::sum(&block, 0).into(),
             |block| block.sum(),
         )
     }
 
+    /// Change the block size of a stream of [`ArrayExt`]s.
     fn resize(self, block_size: usize) -> Resize<Self, T> {
         Resize::new(self, block_size)
     }
@@ -205,14 +211,13 @@ where
         if block_size as u64 % stride == 0 {
             let per_block = block_size as u64 / stride;
             debug_assert_eq!(per_block % stride, 0);
-            let reduced = reduce_small(blocks, per_block, stride, reduce_multi);
+            let reduced = reduce_small(blocks, stride, reduce_multi);
             Box::new(Resize::new(reduced, block_size))
         } else {
             let reduce_block_size = block_size - (block_size % stride as usize);
+            debug_assert_eq!(reduce_block_size % stride as usize, 0);
             let blocks = blocks.resize(reduce_block_size);
-            let per_block = reduce_block_size as u64 / stride;
-            debug_assert_eq!(per_block % stride, 0);
-            let reduced = reduce_small(blocks, per_block, stride, reduce_multi);
+            let reduced = reduce_small(blocks, stride, reduce_multi);
             Box::new(Resize::new(reduced, block_size))
         }
     } else if stride < block_size as u64 {
@@ -240,7 +245,6 @@ where
 
 fn reduce_small<T, B, E, S, R>(
     blocks: S,
-    per_block: u64,
     stride: u64,
     reduce: R,
 ) -> impl Stream<Item = Result<ArrayExt<B>, E>>
@@ -250,10 +254,13 @@ where
     S: Stream<Item = Result<ArrayExt<T>, E>>,
     R: FnMut(af::Array<T>) -> ArrayExt<B>,
 {
-    let shape = af::Dim4::new(&[per_block, stride, 0, 0]);
-
     blocks
-        .map_ok(move |block| af::moddims(&block, shape.clone()))
+        .map_ok(move |block| {
+            assert_eq!(block.len() as u64 % stride, 0);
+            let shape = af::Dim4::new(&[stride, block.len() as u64 / stride, 1, 1]);
+            let block = af::moddims(&block, shape);
+            block
+        })
         .map_ok(reduce)
         .map_ok(ArrayExt::from)
 }
@@ -332,6 +339,7 @@ where
 }
 
 #[pin_project]
+/// Aggregate a [`Stream`] of numbers into a [`Stream`] of [`ArrayExt`]s.
 pub struct Aggregate<S, T: af::HasAfEnum> {
     #[pin]
     source: Fuse<S>,
@@ -340,6 +348,7 @@ pub struct Aggregate<S, T: af::HasAfEnum> {
 }
 
 impl<S: Stream, T: af::HasAfEnum> Aggregate<S, T> {
+    /// Construct a new [`Aggregate`] of numbers into [`ArrayExt`]s.
     pub fn new(source: S, block_size: usize) -> Self {
         Self {
             source: source.fuse(),
@@ -380,10 +389,11 @@ where
 }
 
 #[pin_project]
+/// Struct for the [`ArrayTryStream::resize`] method.
 pub struct Resize<S, T: af::HasAfEnum> {
     #[pin]
     source: Fuse<S>,
-    buffer: ArrayExt<T>,
+    buffer: Option<ArrayExt<T>>,
     block_size: usize,
 }
 
@@ -391,7 +401,7 @@ impl<S: Stream, T: af::HasAfEnum> Resize<S, T> {
     fn new(source: S, block_size: usize) -> Self {
         Self {
             source: source.fuse(),
-            buffer: ArrayExt::from(vec![]),
+            buffer: None,
             block_size,
         }
     }
@@ -403,31 +413,50 @@ impl<T: af::HasAfEnum + Default, E, S: Stream<Item = Result<ArrayExt<T>, E>> + U
     type Item = Result<ArrayExt<T>, E>;
 
     fn poll_next(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        fn clear_buffer<T: af::HasAfEnum>(buffer: &mut ArrayExt<T>) -> ArrayExt<T> {
-            let mut block = ArrayExt::from(vec![]);
-            mem::swap(buffer, &mut block);
-            block
-        }
-
         let mut this = self.project();
 
         Poll::Ready(loop {
-            if this.buffer.len() == *this.block_size {
-                break Some(Ok(clear_buffer(this.buffer)));
-            } else if this.buffer.len() > *this.block_size {
-                let (block, buffer) = this.buffer.split(*this.block_size);
-                *this.buffer = buffer;
-                break Some(Ok(block));
+            if let Some(buffer) = this.buffer.as_mut() {
+                if buffer.len() == *this.block_size {
+                    let mut new_buffer = None;
+                    mem::swap(this.buffer, &mut new_buffer);
+                    break new_buffer.map(Ok);
+                } else if buffer.len() > *this.block_size {
+                    let (block, buffer) = buffer.split(*this.block_size);
+                    *this.buffer = Some(buffer);
+                    break Some(Ok(block));
+                }
             }
 
             match ready!(this.source.as_mut().poll_next(cxt)) {
                 Some(Ok(block)) => {
-                    *this.buffer = ArrayExt::concatenate(&this.buffer, &block);
+                    if let Some(buffer) = this.buffer {
+                        *this.buffer = Some(ArrayExt::concatenate(buffer, &block));
+                    } else {
+                        *this.buffer = Some(block)
+                    }
                 }
                 Some(Err(cause)) => break Some(Err(cause)),
-                None if this.buffer.is_empty() => break None,
-                None => break Some(Ok(clear_buffer(this.buffer))),
+                None if this.buffer.is_none() => break None,
+                None => {
+                    let mut new_buffer = None;
+                    mem::swap(this.buffer, &mut new_buffer);
+                    break new_buffer.map(Ok);
+                }
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sum() {
+        let x = ArrayExt::from(vec![1, 2, 3, 4, 5, 6, 7, 8]);
+        let x = af::moddims(&*x, af::Dim4::new(&[4, 2, 1, 1]));
+        let actual = ArrayExt::<i32>::from(af::sum(&x, 0)).to_vec();
+        assert_eq!(actual, vec![10, 26]);
     }
 }

@@ -43,8 +43,12 @@ mod coords;
 mod ext;
 mod stream;
 
+/// A complex number (an alias for [`num_complex::Complex`].
 pub type Complex<T> = num_complex::Complex<T>;
 
+/// Trait defining the sum of two numbers.
+///
+/// For `bool` this is the same as boolean OR; otherwise it's the same as `Add`.
 pub trait Sum {
     fn sum(self, other: Self) -> Self;
 }
@@ -77,6 +81,9 @@ sum!(f64);
 sum!(Complex<f32>);
 sum!(Complex<f64>);
 
+/// Trait defining the product of two numbers.
+///
+/// For `bool` this is the same as boolean AND; otherwise it's the same as `Mul`.
 pub trait Product {
     fn product(self, other: Self) -> Self;
 }

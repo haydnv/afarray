@@ -726,6 +726,7 @@ fn create_or_append(coords: &mut Option<Coords>, to_append: Coords) {
 }
 
 #[inline]
+/// Convert a coordinate to a linear offset.
 pub fn coord_to_offset(coord: &[u64], coord_bounds: &[u64]) -> u64 {
     coord_bounds
         .iter()
