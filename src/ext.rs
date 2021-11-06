@@ -388,10 +388,11 @@ where
 }
 
 impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Sub for ArrayExt<T>
-    where
-        <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
-        <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
-        <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum, {
+where
+    <T as af::ImplicitPromote<T>>::Output: af::HasAfEnum + Default,
+    <T as af::Convertable>::OutType: af::ImplicitPromote<<T as af::Convertable>::OutType>,
+    <<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output: af::HasAfEnum,
+{
 
     type Output = ArrayExt<<<T as af::Convertable>::OutType as af::ImplicitPromote<<T as af::Convertable>::OutType>>::Output>;
 

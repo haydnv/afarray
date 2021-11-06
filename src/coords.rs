@@ -175,6 +175,7 @@ impl Coords {
 
     fn split(&self, at: usize) -> (Self, Self) {
         assert!(at < self.len());
+
         if at == 0 {
             let shape: Vec<u64> = std::iter::repeat(0).take(self.ndim()).collect();
             return (Coords::empty(&shape, 0), self.clone());
@@ -185,6 +186,7 @@ impl Coords {
 
         let left = af::index(self, &[af::Seq::default(), left]);
         let right = af::index(self, &[af::Seq::default(), right]);
+
         (
             Self {
                 array: left,
@@ -256,6 +258,27 @@ impl Coords {
         Self {
             array: expanded,
             ndim: self.ndim + 1,
+        }
+    }
+
+    /// Return these `Coords` as flipped around `axis` with respect to the given `shape`.
+    ///
+    /// E.g. flipping axis 1 of coordinate `[0, 1, 2]` in shape `[5, 5, 5]` produces `[0, 4, 2]`.
+    ///
+    /// Panics: if `self.ndim() != shape.len()`
+    pub fn flip(self, shape: &[u64], axis: usize) -> Self {
+        assert_eq!(self.ndim, shape.len());
+
+        let mut mask = vec![0i64; self.ndim()];
+        mask[axis] = (shape[axis] - 1) as i64;
+        let mask = af::Array::new(&mask, af::Dim4::new(&[self.ndim() as u64, 1, 1, 1]));
+
+        let coords: af::Array<i64> = self.array.cast();
+        let flipped = af::sub(&mask, &coords, true);
+
+        Self {
+            array: af::abs(&flipped).cast(),
+            ndim: self.ndim,
         }
     }
 
@@ -816,6 +839,7 @@ mod tests {
             vec![0, 1, 0],
             vec![1, 0, 0],
         ];
+
         let coords = Coords::from_iter(coord_vec.to_vec(), 3);
 
         let expected = vec![vec![0, 0, 0], vec![0, 0, 1], vec![0, 1, 0], vec![1, 0, 0]];
