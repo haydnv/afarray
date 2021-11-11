@@ -1,6 +1,6 @@
 [package]
 name = "afarray"
-version = "0.10.2"
+version = "0.10.3"
 authors = ["haydn@tinychain.net"]
 edition = "2018"
 license = "Apache-2.0"

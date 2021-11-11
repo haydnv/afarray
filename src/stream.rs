@@ -262,6 +262,10 @@ where
             block
         })
         .map_ok(reduce)
+        .map_ok(move |reduced| {
+            let shape = af::Dim4::new(&[reduced.len() as u64, 1, 1, 1]);
+            af::moddims(&reduced, shape)
+        })
         .map_ok(ArrayExt::from)
 }
 
