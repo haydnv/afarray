@@ -1233,11 +1233,9 @@ impl Mul for &Array {
         use Array::*;
         match (self, other) {
             (Bool(l), Bool(r)) => Bool(l * r),
-            // Multiplying a 32-bit float causes a stack overflow
-            (C32(l), C32(r)) => &C64(l.type_cast()) * &C64(r.type_cast()),
+            (C32(l), C32(r)) => C32(l * r),
             (C64(l), C64(r)) => C64(l * r),
-            // Multiplying a 32-bit float causes a stack overflow
-            (F32(l), F32(r)) => &F64(l.type_cast()) * &F64(r.type_cast()),
+            (F32(l), F32(r)) => F32(l * r),
             (F64(l), F64(r)) => F64(l * r),
             (I16(l), I16(r)) => I16(l * r),
             (I32(l), I32(r)) => I32(l * r),
@@ -1831,8 +1829,8 @@ mod tests {
 
     #[test]
     fn test_mul_float() {
-        let a: Array = [1, 2, 3][..].into();
-        let b: Array = [2.0][..].into();
+        let a: Array = [1.0f32, 2.0f32, 3.0f32][..].into();
+        let b: Array = [2.0f32][..].into();
         assert_eq!(&a * &b, [2.0, 4.0, 6.0][..].into());
 
         let b: Array = [-1., -4., 4.][..].into();
