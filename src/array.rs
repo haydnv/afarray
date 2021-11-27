@@ -83,6 +83,42 @@ pub fn sum_dtype(array_dtype: NumberType) -> NumberType {
     }
 }
 
+macro_rules! dispatch {
+    ($this:expr, $call:expr) => {
+        match $this {
+            Array::Bool(this) => $call(this),
+            Array::C32(this) => $call(this),
+            Array::C64(this) => $call(this),
+            Array::F32(this) => $call(this),
+            Array::F64(this) => $call(this),
+            Array::I16(this) => $call(this),
+            Array::I32(this) => $call(this),
+            Array::I64(this) => $call(this),
+            Array::U8(this) => $call(this),
+            Array::U16(this) => $call(this),
+            Array::U32(this) => $call(this),
+            Array::U64(this) => $call(this),
+        }
+    };
+}
+
+macro_rules! trig {
+    ($fun:ident) => {
+        pub fn $fun(&self) -> Array {
+            fn $fun<T>(this: &ArrayExt<T>) -> Array
+            where
+                T: af::HasAfEnum + Default,
+                ArrayExt<T>: ArrayInstanceTrig<T>,
+                Array: From<ArrayExt<T::UnaryOutType>>,
+            {
+                this.$fun().into()
+            }
+
+            dispatch!(self, $fun)
+        }
+    };
+}
+
 /// A generic one-dimensional array which supports all variants of [`NumberType`].
 #[derive(Clone)]
 pub enum Array {
@@ -103,21 +139,7 @@ pub enum Array {
 impl Array {
     /// Cast the values of this array into an `ArrayExt<T>`.
     pub fn type_cast<T: af::HasAfEnum>(&self) -> ArrayExt<T> {
-        use Array::*;
-        match self {
-            Bool(b) => b.type_cast(),
-            C32(c) => c.type_cast(),
-            C64(c) => c.type_cast(),
-            F32(f) => f.type_cast(),
-            F64(f) => f.type_cast(),
-            I16(i) => i.type_cast(),
-            I32(i) => i.type_cast(),
-            I64(i) => i.type_cast(),
-            U8(u) => u.type_cast(),
-            U16(u) => u.type_cast(),
-            U32(u) => u.type_cast(),
-            U64(u) => u.type_cast(),
-        }
+        dispatch!(self, ArrayExt::type_cast)
     }
 
     /// Concatenate two `Array`s.
@@ -238,21 +260,15 @@ impl Array {
 
     /// Copy the contents of this `Array` into a new `Vec`.
     pub fn to_vec(&self) -> Vec<Number> {
-        use Array::*;
-        match self {
-            Bool(b) => b.to_vec().into_iter().map(Number::from).collect(),
-            C32(c) => c.to_vec().into_iter().map(Number::from).collect(),
-            C64(c) => c.to_vec().into_iter().map(Number::from).collect(),
-            F32(f) => f.to_vec().into_iter().map(Number::from).collect(),
-            F64(f) => f.to_vec().into_iter().map(Number::from).collect(),
-            I16(i) => i.to_vec().into_iter().map(Number::from).collect(),
-            I32(i) => i.to_vec().into_iter().map(Number::from).collect(),
-            I64(i) => i.to_vec().into_iter().map(Number::from).collect(),
-            U8(u) => u.to_vec().into_iter().map(Number::from).collect(),
-            U16(u) => u.to_vec().into_iter().map(Number::from).collect(),
-            U32(u) => u.to_vec().into_iter().map(Number::from).collect(),
-            U64(u) => u.to_vec().into_iter().map(Number::from).collect(),
+        fn to_vec<T>(this: &ArrayExt<T>) -> Vec<Number>
+        where
+            T: af::HasAfEnum + Clone + Default,
+            Number: From<T>,
+        {
+            this.to_vec().into_iter().map(Number::from).collect()
         }
+
+        dispatch!(self, to_vec)
     }
 
     /// Calculate the element-wise absolute value.
@@ -272,40 +288,12 @@ impl Array {
 
     /// Returns `true` if all elements of this `Array` are nonzero.
     pub fn all(&self) -> bool {
-        use Array::*;
-        match self {
-            Bool(b) => b.all(),
-            C32(c) => c.all(),
-            C64(c) => c.all(),
-            F32(f) => f.all(),
-            F64(f) => f.all(),
-            I16(i) => i.all(),
-            I32(i) => i.all(),
-            I64(i) => i.all(),
-            U8(u) => u.all(),
-            U16(u) => u.all(),
-            U32(u) => u.all(),
-            U64(u) => u.all(),
-        }
+        dispatch!(self, ArrayExt::all)
     }
 
     /// Returns `true` if any element of this `Array` is nonzero.
     pub fn any(&self) -> bool {
-        use Array::*;
-        match self {
-            Bool(b) => b.any(),
-            C32(c) => c.any(),
-            C64(c) => c.any(),
-            F32(f) => f.any(),
-            F64(f) => f.any(),
-            I16(i) => i.any(),
-            I32(i) => i.any(),
-            I64(i) => i.any(),
-            U8(u) => u.any(),
-            U16(u) => u.any(),
-            U32(u) => u.any(),
-            U64(u) => u.any(),
-        }
+        dispatch!(self, ArrayExt::any)
     }
 
     /// Element-wise logical and.
@@ -377,21 +365,15 @@ impl Array {
 
     /// Raise `e` to the power of `self`.
     pub fn exp(&self) -> Array {
-        use Array::*;
-        match self {
-            Bool(l) => l.exp().into(),
-            C32(l) => l.exp().into(),
-            C64(l) => l.exp().into(),
-            F32(l) => l.exp().into(),
-            F64(l) => l.exp().into(),
-            I16(l) => l.exp().into(),
-            I32(l) => l.exp().into(),
-            I64(l) => l.exp().into(),
-            U8(l) => l.exp().into(),
-            U16(l) => l.exp().into(),
-            U32(l) => l.exp().into(),
-            U64(l) => l.exp().into(),
+        fn exp<T>(this: &ArrayExt<T>) -> Array
+        where
+            T: af::HasAfEnum + Default,
+            Array: From<ArrayExt<T::UnaryOutType>>,
+        {
+            this.exp().into()
         }
+
+        dispatch!(self, exp)
     }
 
     /// Element-wise greater-than comparison.
@@ -497,40 +479,28 @@ impl Array {
 
     /// Element-wise check for infinite values.
     pub fn is_infinite(&self) -> Array {
-        use Array::*;
-        match self {
-            Bool(b) => b.is_infinite().into(),
-            C32(c) => c.is_infinite().into(),
-            C64(c) => c.is_infinite().into(),
-            F32(f) => f.is_infinite().into(),
-            F64(f) => f.is_infinite().into(),
-            I16(i) => i.is_infinite().into(),
-            I32(i) => i.is_infinite().into(),
-            I64(i) => i.is_infinite().into(),
-            U8(u) => u.is_infinite().into(),
-            U16(u) => u.is_infinite().into(),
-            U32(u) => u.is_infinite().into(),
-            U64(u) => u.is_infinite().into(),
+        fn is_infinite<T>(this: &ArrayExt<T>) -> Array
+        where
+            T: af::HasAfEnum + Default,
+            ArrayExt<T>: ArrayInstanceUnreal,
+        {
+            this.is_infinite().into()
         }
+
+        dispatch!(self, is_infinite)
     }
 
     /// Element-wise check for non-numeric (NaN) values.
     pub fn is_nan(&self) -> Array {
-        use Array::*;
-        match self {
-            Bool(b) => b.is_nan().into(),
-            C32(c) => c.is_nan().into(),
-            C64(c) => c.is_nan().into(),
-            F32(f) => f.is_nan().into(),
-            F64(f) => f.is_nan().into(),
-            I16(i) => i.is_nan().into(),
-            I32(i) => i.is_nan().into(),
-            I64(i) => i.is_nan().into(),
-            U8(u) => u.is_nan().into(),
-            U16(u) => u.is_nan().into(),
-            U32(u) => u.is_nan().into(),
-            U64(u) => u.is_nan().into(),
+        fn is_nan<T>(this: &ArrayExt<T>) -> Array
+        where
+            T: af::HasAfEnum + Default,
+            ArrayExt<T>: ArrayInstanceUnreal,
+        {
+            this.is_nan().into()
         }
+
+        dispatch!(self, is_nan)
     }
 
     /// Element-wise less-than comparison.
@@ -714,59 +684,39 @@ impl Array {
 
     /// Calculate the cumulative product of this `Array`.
     pub fn product(&self) -> Number {
-        use Array::*;
-        match self {
-            Bool(b) => Number::Bool(b.product().into()),
-            C32(c) => Number::Complex(c.product().into()),
-            C64(c) => Number::Complex(c.product().into()),
-            F32(f) => Number::Float(f.product().into()),
-            F64(f) => Number::Float(f.product().into()),
-            I16(i) => Number::Int(i.product().into()),
-            I32(i) => Number::Int(i.product().into()),
-            I64(i) => Number::Int(i.product().into()),
-            U8(u) => Number::UInt(u.product().into()),
-            U16(u) => Number::UInt(u.product().into()),
-            U32(u) => Number::UInt(u.product().into()),
-            U64(u) => Number::UInt(u.product().into()),
+        fn product<T>(this: &ArrayExt<T>) -> Number
+        where
+            T: af::HasAfEnum + Default,
+            T::AggregateOutType: number_general::DType,
+            T::ProductOutType: number_general::DType,
+            ArrayExt<T>: ArrayInstanceReduce<T>,
+            Number: From<T::ProductOutType>,
+        {
+            this.product().into()
         }
+
+        dispatch!(self, product)
     }
 
     /// Calculate the cumulative sum of this `Array`.
     pub fn sum(&self) -> Number {
-        use Array::*;
-        match self {
-            Bool(b) => Number::UInt(b.sum().into()),
-            C32(c) => Number::Complex(c.sum().into()),
-            C64(c) => Number::Complex(c.sum().into()),
-            F32(f) => Number::Float(f.sum().into()),
-            F64(f) => Number::Float(f.sum().into()),
-            I16(i) => Number::Int(i.sum().into()),
-            I32(i) => Number::Int(i.sum().into()),
-            I64(i) => Number::Int(i.sum().into()),
-            U8(u) => Number::UInt(u.sum().into()),
-            U16(u) => Number::UInt(u.sum().into()),
-            U32(u) => Number::UInt(u.sum().into()),
-            U64(u) => Number::UInt(u.sum().into()),
+        fn sum<T>(this: &ArrayExt<T>) -> Number
+        where
+            T: af::HasAfEnum + Default,
+            T::AggregateOutType: number_general::DType,
+            T::ProductOutType: number_general::DType,
+            ArrayExt<T>: ArrayInstanceReduce<T>,
+            Number: From<T::AggregateOutType>,
+        {
+            this.sum().into()
         }
+
+        dispatch!(self, sum)
     }
 
     /// The number of elements in this `Array`.
     pub fn len(&self) -> usize {
-        use Array::*;
-        match self {
-            Bool(b) => b.len(),
-            C32(c) => c.len(),
-            C64(c) => c.len(),
-            F32(f) => f.len(),
-            F64(f) => f.len(),
-            I16(i) => i.len(),
-            I32(i) => i.len(),
-            I64(i) => i.len(),
-            U8(u) => u.len(),
-            U16(u) => u.len(),
-            U32(u) => u.len(),
-            U64(u) => u.len(),
-        }
+        dispatch!(self, ArrayExt::len)
     }
 
     /// Get the value at the specified index.
@@ -1055,6 +1005,21 @@ impl Array {
             }
         }
     }
+
+    // TODO: how to include documentation in macro invocations?
+
+    trig! {sin}
+    trig! {asin}
+    trig! {sinh}
+    trig! {asinh}
+    trig! {cos}
+    trig! {acos}
+    trig! {cosh}
+    trig! {acosh}
+    trig! {tan}
+    trig! {atan}
+    trig! {tanh}
+    trig! {atanh}
 
     /// Element-wise logical xor.
     pub fn xor(&self, other: &Array) -> Array {

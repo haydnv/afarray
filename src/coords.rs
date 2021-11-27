@@ -19,6 +19,8 @@ pub type Coord = Vec<u64>;
 pub type Offsets = ArrayExt<u64>;
 
 /// A hardware-accelerated set of n-dimensional coordinates, all with the same dimension.
+///
+/// TODO: separate out a `CoordBasis` struct
 #[derive(Clone)]
 pub struct Coords {
     array: af::Array<u64>,

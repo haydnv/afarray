@@ -775,6 +775,36 @@ macro_rules! reduce_complex {
 reduce_complex!(f32);
 reduce_complex!(f64);
 
+macro_rules! unary {
+    ($t:ty, $f:ident) => {
+        fn $f(&self) -> ArrayExt<<$t>::UnaryOutType> {
+            af::$f(self).into()
+        }
+    };
+}
+
+pub trait ArrayInstanceTrig<T>: ArrayInstance<DType = T>
+where
+    T: af::HasAfEnum,
+{
+    unary!(T, sin);
+    unary!(T, asin);
+    unary!(T, sinh);
+    unary!(T, asinh);
+
+    unary!(T, cos);
+    unary!(T, acos);
+    unary!(T, cosh);
+    unary!(T, acosh);
+
+    unary!(T, tan);
+    unary!(T, atan);
+    unary!(T, tanh);
+    unary!(T, atanh);
+}
+
+impl<T: af::HasAfEnum + Default> ArrayInstanceTrig<T> for ArrayExt<T> {}
+
 impl<'de, T: af::HasAfEnum + Deserialize<'de> + 'de> Deserialize<'de> for ArrayExt<T>
 where
     ArrayExt<T>: From<Vec<T>>,
