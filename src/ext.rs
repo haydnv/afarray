@@ -603,6 +603,47 @@ impl ArrayInstanceAnyAll for ArrayExt<Complex<f64>> {
     }
 }
 
+/// Indexing operations for `ArrayExt`
+pub trait ArrayInstanceIndex: ArrayInstance {
+    fn argmax(&self) -> (usize, Self::DType);
+}
+
+macro_rules! array_index_real {
+    ($t:ty) => {
+        impl ArrayInstanceIndex for ArrayExt<$t> {
+            fn argmax(&self) -> (usize, $t) {
+                let (max, _, i) = af::imax_all(self);
+                (i as usize, max)
+            }
+        }
+    };
+}
+
+array_index_real!(bool);
+array_index_real!(f32);
+array_index_real!(f64);
+array_index_real!(i16);
+array_index_real!(i32);
+array_index_real!(i64);
+array_index_real!(u8);
+array_index_real!(u16);
+array_index_real!(u32);
+array_index_real!(u64);
+
+macro_rules! array_index_complex {
+    ($t:ty) => {
+        impl ArrayInstanceIndex for ArrayExt<$t> {
+            fn argmax(&self) -> (usize, $t) {
+                let (max_re, max_im, i) = af::imax_all(self);
+                (i as usize, <$t>::new(max_re, max_im))
+            }
+        }
+    };
+}
+
+array_index_complex!(Complex<f32>);
+array_index_complex!(Complex<f64>);
+
 /// Methods to check for infinite or non-numeric array elements.
 pub trait ArrayInstanceUnreal {
     /// Element-wise check for infinite values.

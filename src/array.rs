@@ -310,6 +310,20 @@ impl Array {
         Array::Bool(this.and(&that))
     }
 
+    /// Find the maximum value in this `Array` and its offset.
+    pub fn argmax(&self) -> (usize, Number) {
+        fn imax<T: af::HasAfEnum>(x: &ArrayExt<T>) -> (usize, Number)
+        where
+            ArrayExt<T>: ArrayInstanceIndex,
+            Number: From<<ArrayExt<T> as ArrayInstance>::DType>,
+        {
+            let (i, max) = x.argmax();
+            (i, max.into())
+        }
+
+        dispatch!(self, imax)
+    }
+
     /// Element-wise equality comparison.
     pub fn eq(&self, other: &Array) -> Array {
         use Array::*;
