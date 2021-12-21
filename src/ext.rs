@@ -4,12 +4,14 @@ use std::marker::PhantomData;
 use std::ops::*;
 
 use arrayfire as af;
+use async_hash::Hash;
 use async_trait::async_trait;
 use destream::{de, en};
 use futures::{future, stream, Stream};
 use number_general::{DType, NumberType};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
+use sha2::digest::{Digest, Output};
 
 use super::{dim4, Complex};
 
@@ -295,6 +297,79 @@ impl ArrayExt<u64> {
         }
     }
 }
+
+#[async_trait]
+impl<D: Digest> Hash<D> for ArrayExt<bool> {
+    fn hash(self) -> Output<D> {
+        let hashable = self.to_vec();
+        let mut hasher = D::new();
+        for b in hashable {
+            hasher.update([b as u8]);
+        }
+        hasher.finalize()
+    }
+}
+
+#[async_trait]
+impl<D: Digest> Hash<D> for ArrayExt<num_complex::Complex<f32>> {
+    fn hash(self) -> Output<D> {
+        let hashable = self.to_vec();
+        let mut hasher = D::new();
+        for e in hashable {
+            hasher.update([e.re.to_be_bytes(), e.im.to_be_bytes()].concat());
+        }
+        hasher.finalize()
+    }
+}
+
+#[async_trait]
+impl<D: Digest> Hash<D> for ArrayExt<num_complex::Complex<f64>> {
+    fn hash(self) -> Output<D> {
+        let hashable = self.to_vec();
+        let mut hasher = D::new();
+        for e in hashable {
+            hasher.update([e.re.to_be_bytes(), e.im.to_be_bytes()].concat());
+        }
+        hasher.finalize()
+    }
+}
+
+#[async_trait]
+impl<D: Digest> Hash<D> for ArrayExt<u8> {
+    fn hash(self) -> Output<D> {
+        let hashable = self.to_vec();
+        let mut hasher = D::new();
+        for b in hashable {
+            hasher.update([b]);
+        }
+        hasher.finalize()
+    }
+}
+
+macro_rules! hash_array {
+    ($ty:ty) => {
+        #[async_trait]
+        impl<D: Digest> Hash<D> for ArrayExt<$ty> {
+            fn hash(self) -> Output<D> {
+                let hashable = self.to_vec();
+                let mut hasher = D::new();
+                for e in hashable {
+                    hasher.update(e.to_be_bytes());
+                }
+                hasher.finalize()
+            }
+        }
+    };
+}
+
+hash_array!(f32);
+hash_array!(f64);
+hash_array!(i16);
+hash_array!(i32);
+hash_array!(i64);
+hash_array!(u16);
+hash_array!(u32);
+hash_array!(u64);
 
 impl<T: af::HasAfEnum + af::ImplicitPromote<T> + af::Convertable<OutType = T>> Add for ArrayExt<T>
     where
