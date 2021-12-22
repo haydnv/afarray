@@ -520,6 +520,48 @@ impl Array {
         dispatch!(self, is_nan)
     }
 
+    /// Compute the natural log of this `Array`.
+    pub fn ln(&self) -> Array {
+        fn ln<T>(this: &ArrayExt<T>) -> Array
+        where
+            T: af::HasAfEnum + Default,
+            Array: From<ArrayExt<T::UnaryOutType>>,
+        {
+            this.ln().into()
+        }
+
+        dispatch!(self, ln)
+    }
+
+    /// Compute the logarithm of this `Array` with respect to the given `base`.
+    pub fn log(&self, base: &Array) -> Array {
+        use Array::*;
+        match (self, base) {
+            (Bool(l), Bool(r)) => l.log(r).into(),
+            (C32(l), C32(r)) => l.log(r).into(),
+            (C64(l), C64(r)) => l.log(r).into(),
+            (F32(l), F32(r)) => l.log(r).into(),
+            (F64(l), F64(r)) => l.log(r).into(),
+            (I16(l), I16(r)) => l.log(r).into(),
+            (I32(l), I32(r)) => l.log(r).into(),
+            (I64(l), I64(r)) => l.log(r).into(),
+            (U8(l), U8(r)) => l.log(r).into(),
+            (U16(l), U16(r)) => l.log(r).into(),
+            (U32(l), U32(r)) => l.log(r).into(),
+            (U64(l), U64(r)) => l.log(r).into(),
+            (l, r) => match (l.dtype(), r.dtype()) {
+                (l_dtype, r_dtype) if l_dtype > r_dtype => l.log(&r.cast_into(l_dtype)),
+                (l_dtype, r_dtype) if l_dtype < r_dtype => l.cast_into(r_dtype).log(&r),
+                (l, r) => unreachable!("{} log {}", l, r),
+            },
+        }
+    }
+
+    /// Compute the logarithm of this `Array` with respect to the given constant `base`.
+    pub fn log_const(&self, base: Number) -> Array {
+        (&self.ln()) / base.ln()
+    }
+
     /// Element-wise less-than comparison.
     pub fn lt(&self, other: &Array) -> Array {
         use Array::*;

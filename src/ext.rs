@@ -791,6 +791,56 @@ where
     }
 }
 
+/// Defines the natural logarithm.
+pub trait ArrayInstanceNaturalLog<T>: ArrayInstance
+where
+    T: af::HasAfEnum,
+{
+    /// Calculate the element-wise natural logarithm.
+    fn ln(&self) -> ArrayExt<T::UnaryOutType>;
+}
+
+impl<T> ArrayInstanceNaturalLog<T> for ArrayExt<T>
+where
+    T: af::HasAfEnum,
+{
+    fn ln(&self) -> ArrayExt<T::UnaryOutType> {
+        af::log(self).into()
+    }
+}
+
+/// Defines a general logarithm.
+pub trait ArrayInstanceLog<T, U>: ArrayInstance
+where
+    T: af::HasAfEnum,
+    U: af::HasAfEnum,
+    ArrayExt<T>: ArrayInstanceNaturalLog<T>,
+    ArrayExt<U>: ArrayInstanceNaturalLog<U>,
+    ArrayExt<T::UnaryOutType>: Div<ArrayExt<U::UnaryOutType>>,
+{
+    /// Calculate the element-wise logarithm.
+    fn log(
+        &self,
+        base: &ArrayExt<U>,
+    ) -> <ArrayExt<T::UnaryOutType> as Div<ArrayExt<U::UnaryOutType>>>::Output;
+}
+
+impl<T, U> ArrayInstanceLog<T, U> for ArrayExt<T>
+where
+    T: af::HasAfEnum,
+    U: af::HasAfEnum,
+    Self: ArrayInstanceNaturalLog<T>,
+    ArrayExt<U>: ArrayInstanceNaturalLog<U>,
+    ArrayExt<T::UnaryOutType>: Div<ArrayExt<U::UnaryOutType>>,
+{
+    fn log(
+        &self,
+        base: &ArrayExt<U>,
+    ) -> <ArrayExt<T::UnaryOutType> as Div<ArrayExt<U::UnaryOutType>>>::Output {
+        self.ln() / base.ln()
+    }
+}
+
 /// Defines an exponentiation method `pow`.
 pub trait ArrayInstancePow<U>: ArrayInstance {
     type Pow: af::HasAfEnum;
