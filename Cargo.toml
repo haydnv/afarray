@@ -13,7 +13,6 @@ keywords = ["array", "arrayfire", "gpu", "ndarray", "tensor"]
 
 [dependencies]
 arrayfire = "3.8"
-async-hash = "0.2"
 async-trait = "0.1"
 destream = "0.5"
 futures = "0.3"
@@ -24,7 +23,6 @@ number-general = { version = "~0.5.2", features=["serde", "stream"] }
 pin-project = "1.0"
 safecast = "0.1"
 serde = "1.0"
-sha2 = "0.10"
 
 [dev-dependencies]
 tbon = "~0.3.5"

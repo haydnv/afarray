@@ -3,7 +3,6 @@ use std::iter::FromIterator;
 use std::ops::*;
 
 use arrayfire as af;
-use async_hash::Hash;
 use async_trait::async_trait;
 use destream::{de, en};
 use futures::TryFutureExt;
@@ -12,8 +11,6 @@ use number_general::*;
 use safecast::{CastFrom, CastInto};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
-use sha2::digest::Output;
-use sha2::Digest;
 
 use super::ext::*;
 use super::{error, Complex, Result};
@@ -1102,12 +1099,6 @@ impl PartialEq for Array {
         } else {
             Array::eq(self, other).all()
         }
-    }
-}
-
-impl<D: Digest> Hash<D> for Array {
-    fn hash(self) -> Output<D> {
-        dispatch!(self, Hash::<D>::hash)
     }
 }
 
