@@ -217,9 +217,9 @@ impl Array {
             I16(_) => i16::dtype(),
             I32(_) => i32::dtype(),
             I64(_) => i64::dtype(),
-            U8(_) => u64::dtype(),
-            U16(_) => u64::dtype(),
-            U32(_) => u64::dtype(),
+            U8(_) => u8::dtype(),
+            U16(_) => u16::dtype(),
+            U32(_) => u32::dtype(),
             U64(_) => u64::dtype(),
         }
     }
