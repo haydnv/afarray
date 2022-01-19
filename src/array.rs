@@ -856,6 +856,18 @@ impl Array {
         }
     }
 
+    /// Round this `Array` to the nearest integer, element-wise
+    pub fn round(&self) -> Self {
+        fn round<T: af::HasAfEnum>(x: &ArrayExt<T>) -> Array
+        where
+            Array: From<ArrayExt<<ArrayExt<T> as ArrayInstanceRound>::Round>>,
+        {
+            x.round().into()
+        }
+
+        dispatch!(self, round)
+    }
+
     /// Set the values at the specified coordinates to the corresponding values in `other`.
     pub fn set(&mut self, index: &ArrayExt<u64>, other: &Array) -> Result<()> {
         let mut indexer = af::Indexer::default();

@@ -557,6 +557,22 @@ impl ArrayInstanceAbs for ArrayExt<i64> {
     }
 }
 
+/// Defines a rounding method `round`.
+pub trait ArrayInstanceRound: ArrayInstance {
+    type Round: af::HasAfEnum;
+
+    /// Round to the nearest integer, element-wise.
+    fn round(&self) -> ArrayExt<Self::Round>;
+}
+
+impl<T: af::HasAfEnum> ArrayInstanceRound for ArrayExt<T> {
+    type Round = T::AbsOutType;
+
+    fn round(&self) -> ArrayExt<Self::Round> {
+        ArrayExt(af::round(self))
+    }
+}
+
 /// Defines cumulative boolean operations `any` and `all`.
 pub trait ArrayInstanceAnyAll: ArrayInstance {
     /// Returns `true` if all elements are nonzero.
