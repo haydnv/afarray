@@ -98,7 +98,7 @@ pub trait ArrayInstance: Deref<Target = af::Array<Self::DType>> + DerefMut {
 pub struct ArrayExt<T: af::HasAfEnum>(af::Array<T>);
 
 impl<T: af::HasAfEnum + Default> ArrayExt<T> {
-    /// Construct a new ArrayExt with the given value and length.
+    /// Construct a new `ArrayExt` with the given value and length.
     pub fn constant(value: T, length: usize) -> Self
     where
         T: af::ConstGenerator<OutType = T>,
@@ -115,15 +115,6 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     /// Raise `e` to the power of `self`.
     pub fn exp(&self) -> ArrayExt<T::UnaryOutType> {
         af::exp(self).into()
-    }
-
-    /// Return `true` if the elements of this `ArrayExt` are in sorted order.
-    pub fn is_sorted(&self) -> bool
-    where
-        T: af::RealNumber + Clone,
-    {
-        let sorted = self.sorted(true);
-        af::all_true_all(&af::eq(self.deref(), sorted.deref(), false)).0
     }
 
     /// Cast the values of this `ArrayExt` into a destination type `D`.
@@ -162,23 +153,6 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
         af::index(self, &[af::Seq::new(start as f32, (end - 1) as f32, 1.)]).into()
     }
 
-    /// Sort this `ArrayExt`.
-    pub fn sort(&mut self, ascending: bool)
-    where
-        T: af::RealNumber,
-    {
-        *self = self.sorted(ascending)
-    }
-
-    /// Return a sorted copy of this `ArrayExt`.
-    pub fn sorted(&self, ascending: bool) -> Self
-    where
-        T: af::RealNumber,
-    {
-        debug_assert_eq!(self.0.dims(), dim4(self.len()));
-        Self(af::sort(&self.0, 0, ascending))
-    }
-
     /// Split this `ArrayExt<T>` into two new instances at the given pivot.
     pub fn split(&self, at: usize) -> (Self, Self) {
         let left = af::Seq::new(0.0, at as f32, 1.0);
@@ -187,16 +161,6 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
             ArrayExt(af::index(self, &[left, af::Seq::default()])),
             ArrayExt(af::index(self, &[right, af::Seq::default()])),
         )
-    }
-
-    /// Return only the unique values from this `ArrayExt`.
-    ///
-    /// Pass `true` for `sorted` if this `ArrayExt` is known to be in sorted order.
-    pub fn unique(&self, sorted: bool) -> Self
-    where
-        T: af::RealNumber,
-    {
-        Self(af::set_unique(self, sorted))
     }
 
     fn into_stream(self) -> impl Stream<Item = Vec<T>>
@@ -211,6 +175,51 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
         T: Clone,
     {
         stream::once(future::ready(self.to_vec()))
+    }
+}
+
+impl<T: af::HasAfEnum + af::RealNumber + Clone + Default> ArrayExt<T> {
+    /// Return `true` if the elements of this `ArrayExt` are in sorted order.
+    pub fn is_sorted(&self) -> bool
+    where
+        T: af::RealNumber + Clone,
+    {
+        let sorted = self.sorted(true);
+        af::all_true_all(&af::eq(self.deref(), sorted.deref(), false)).0
+    }
+
+    /// Sort this `ArrayExt`.
+    pub fn sort(&mut self, ascending: bool) {
+        *self = self.sorted(ascending)
+    }
+
+    /// Return a sorted copy of this `ArrayExt`.
+    pub fn sorted(&self, ascending: bool) -> Self {
+        debug_assert_eq!(self.0.dims(), dim4(self.len()));
+        Self(af::sort(&self.0, 0, ascending))
+    }
+
+    /// Return only the unique values from this `ArrayExt`.
+    ///
+    /// Pass `true` for `sorted` if this `ArrayExt` is known to be in sorted order.
+    pub fn unique(&self, sorted: bool) -> Self {
+        Self(af::set_unique(self, sorted))
+    }
+}
+
+impl<T: af::HasAfEnum + af::FloatingPoint + Default> ArrayExt<T> {
+    /// Construct a new `ArrayExt` with a random normal distribution.
+    pub fn random_normal(length: usize) -> Self {
+        let dim = dim4(length);
+        let engine = af::get_default_random_engine();
+        Self(af::random_normal(dim, &engine))
+    }
+
+    /// Construct a new `ArrayExt` with a uniform random distribution.
+    pub fn random_uniform(length: usize) -> Self {
+        let dim = dim4(length);
+        let engine = af::get_default_random_engine();
+        Self(af::random_uniform(dim, &engine))
     }
 }
 

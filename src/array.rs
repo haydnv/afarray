@@ -170,7 +170,7 @@ impl Array {
         }
     }
 
-    /// Construct a new array with the given constant value and length.
+    /// Construct a new `Array` with the given constant value and length.
     pub fn constant(value: Number, length: usize) -> Array {
         use number_general::Complex;
         use Array::*;
@@ -200,6 +200,22 @@ impl Array {
                 UInt::U32(u) => U32(ArrayExt::constant(u, length)),
                 UInt::U64(u) => U64(ArrayExt::constant(u, length)),
             },
+        }
+    }
+
+    /// Construct a new `Array` with a random normal distribution.
+    pub fn random_normal(dtype: FloatType, length: usize) -> Array {
+        match dtype {
+            FloatType::F32 => Array::F32(ArrayExt::random_normal(length)),
+            _ => Array::F64(ArrayExt::random_normal(length)),
+        }
+    }
+
+    /// Construct a new `Array` with a uniform random distribution.
+    pub fn random_uniform(dtype: FloatType, length: usize) -> Array {
+        match dtype {
+            FloatType::F32 => Array::F32(ArrayExt::random_uniform(length)),
+            _ => Array::F64(ArrayExt::random_uniform(length)),
         }
     }
 
