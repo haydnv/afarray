@@ -102,6 +102,25 @@ macro_rules! dispatch {
     };
 }
 
+macro_rules! reduce {
+    ($this:expr, $reduce:expr, $stride:expr) => {
+        match $this {
+            Array::Bool(this) => $reduce(this, $stride),
+            Array::C32(this) => $reduce(this, $stride),
+            Array::C64(this) => $reduce(this, $stride),
+            Array::F32(this) => $reduce(this, $stride),
+            Array::F64(this) => $reduce(this, $stride),
+            Array::I16(this) => $reduce(this, $stride),
+            Array::I32(this) => $reduce(this, $stride),
+            Array::I64(this) => $reduce(this, $stride),
+            Array::U8(this) => $reduce(this, $stride),
+            Array::U16(this) => $reduce(this, $stride),
+            Array::U32(this) => $reduce(this, $stride),
+            Array::U64(this) => $reduce(this, $stride),
+        }
+    };
+}
+
 macro_rules! trig {
     ($fun:ident) => {
         pub fn $fun(&self) -> Array {
@@ -752,6 +771,46 @@ impl Array {
         let this: ArrayExt<bool> = self.type_cast();
         let that: ArrayExt<bool> = ArrayExt::from(&[other.cast_into()][..]);
         Array::Bool(this.or(&that))
+    }
+
+    /// Compute the product of each `stride` of this `Array`
+    pub fn reduce_product(&self, stride: u64) -> Result<Array> {
+        if self.len() as u64 % stride != 0 {
+            return Err(error(format!(
+                "cannot reduce an Array of length {} with stride {}",
+                self.len(),
+                stride
+            )));
+        }
+
+        fn reduce_block_dispatch<T: af::HasAfEnum>(block: &ArrayExt<T>, stride: u64) -> Array
+        where
+            Array: From<ArrayExt<T::ProductOutType>>,
+        {
+            reduce_block(block, stride, &mut |block| af::product(&block, 0).into()).into()
+        }
+
+        Ok(reduce!(self, reduce_block_dispatch, stride))
+    }
+
+    /// Compute the sum of each `stride` of a single block
+    pub fn reduce_sum(&self, stride: u64) -> Result<Array> {
+        if self.len() as u64 % stride != 0 {
+            return Err(error(format!(
+                "cannot reduce an Array of length {} with stride {}",
+                self.len(),
+                stride
+            )));
+        }
+
+        fn reduce_block_dispatch<T: af::HasAfEnum>(block: &ArrayExt<T>, stride: u64) -> Array
+        where
+            Array: From<ArrayExt<T::AggregateOutType>>,
+        {
+            reduce_block(block, stride, &mut |block| af::sum(&block, 0).into()).into()
+        }
+
+        Ok(reduce!(self, reduce_block_dispatch, stride))
     }
 
     /// Calculate the cumulative product of this `Array`.
@@ -1777,6 +1836,20 @@ impl<'en> en::IntoStream<'en> for DType {
     fn into_stream<E: en::Encoder<'en>>(self, encoder: E) -> std::result::Result<E::Ok, E::Error> {
         self.to_u8().into_stream(encoder)
     }
+}
+
+pub(super) fn reduce_block<T, B, R>(block: &ArrayExt<T>, stride: u64, reduce: &mut R) -> ArrayExt<B>
+where
+    T: af::HasAfEnum,
+    B: af::HasAfEnum,
+    R: FnMut(af::Array<T>) -> ArrayExt<B>,
+{
+    assert_eq!(block.len() as u64 % stride, 0);
+    let shape = af::Dim4::new(&[stride, block.len() as u64 / stride, 1, 1]);
+    let block = af::moddims(&block, shape);
+    let reduced = reduce(block.into());
+    let shape = af::Dim4::new(&[reduced.len() as u64, 1, 1, 1]);
+    af::moddims(&reduced, shape).into()
 }
 
 #[cfg(test)]

@@ -9,7 +9,8 @@ use number_general::*;
 use pin_project::pin_project;
 
 use crate::{
-    Array, ArrayExt, ArrayInstance, ArrayInstanceReduce, Complex, HasArrayExt, Product, Sum,
+    reduce_block, Array, ArrayExt, ArrayInstance, ArrayInstanceReduce, Complex, HasArrayExt,
+    Product, Sum,
 };
 
 /// Compute the product of each `stride` of a [`Stream`] of [`Array`]s.
@@ -246,7 +247,7 @@ where
 fn reduce_small<T, B, E, S, R>(
     blocks: S,
     stride: u64,
-    reduce: R,
+    mut reduce: R,
 ) -> impl Stream<Item = Result<ArrayExt<B>, E>>
 where
     T: af::HasAfEnum,
@@ -254,19 +255,7 @@ where
     S: Stream<Item = Result<ArrayExt<T>, E>>,
     R: FnMut(af::Array<T>) -> ArrayExt<B>,
 {
-    blocks
-        .map_ok(move |block| {
-            assert_eq!(block.len() as u64 % stride, 0);
-            let shape = af::Dim4::new(&[stride, block.len() as u64 / stride, 1, 1]);
-            let block = af::moddims(&block, shape);
-            block
-        })
-        .map_ok(reduce)
-        .map_ok(move |reduced| {
-            let shape = af::Dim4::new(&[reduced.len() as u64, 1, 1, 1]);
-            af::moddims(&reduced, shape)
-        })
-        .map_ok(ArrayExt::from)
+    blocks.map_ok(move |block| reduce_block(&block, stride, &mut reduce))
 }
 
 #[pin_project]
