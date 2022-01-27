@@ -240,6 +240,47 @@ impl Coords {
         self.get(&index)
     }
 
+    /// Return the `Coords` of source elements to reduce along the given axis.
+    ///
+    /// Panics: if `reduce_axis <= source_shape.len()`
+    pub fn expand(&self, source_shape: &[u64], reduce_axis: usize) -> Self {
+        assert!(reduce_axis <= source_shape.len());
+
+        let ndim = self.ndim + 1;
+        let reduce_dim = source_shape[reduce_axis];
+
+        let dims = af::Dim4::new(&[1, reduce_dim, 1, 1]);
+        let reduced = af::range(dims, 1);
+
+        let reduce_index = vec![reduce_axis as u64];
+
+        let index: Vec<u64> = (0..self.ndim)
+            .map(|x| if x < reduce_axis { x } else { x + 1 })
+            .map(|x| x as u64)
+            .collect();
+
+        let tile_dims = af::Dim4::new(&[1, reduce_dim, 1, 1]);
+        let source_coord_dims = af::Dim4::new(&[ndim as u64, reduce_dim, 1, 1]);
+
+        let mut expanded = Vec::with_capacity(self.len());
+        for i in 0..self.dims()[1] {
+            let i = i as f64;
+            let seqs = &[af::Seq::default(), af::Seq::new(i, i, 1.0)];
+            let coord = af::index(&self.array, seqs);
+            let coord = af::tile(&coord, tile_dims);
+
+            let mut expanded_coord = af::constant(0, source_coord_dims);
+            index_set(&mut expanded_coord, &index, &coord);
+            index_set(&mut expanded_coord, &reduce_index, &reduced);
+            expanded.push(expanded_coord);
+        }
+
+        Self {
+            array: af::join_many(1, expanded.iter().collect()),
+            ndim,
+        }
+    }
+
     /// Return a copy of these `Coords` with a new dimension at the given axis.
     ///
     /// Panics: if `axis` is greater than `self.ndim()`
@@ -259,7 +300,7 @@ impl Coords {
 
         Self {
             array: expanded,
-            ndim: self.ndim + 1,
+            ndim,
         }
     }
 
@@ -868,5 +909,29 @@ mod tests {
         let coords = Coords::from_iter(vec![vec![8, 15, 2, 1, 10, 3], vec![9, 16, 3, 4, 11, 6]], 6);
         let actual = coords.unbroadcast(&[5, 1, 1, 10], &[true, true, false, true, true, false]);
         assert_eq!(actual.to_vec(), vec![vec![2, 0, 0, 3], vec![3, 0, 0, 6]]);
+    }
+
+    #[test]
+    fn test_reduce() {
+        let coords = Coords::from_iter(vec![vec![0, 1], vec![1, 2]], 2);
+        let actual = coords.expand(&[2, 3, 5], 0);
+        assert_eq!(
+            actual.to_vec(),
+            vec![vec![0, 0, 1], vec![1, 0, 1], vec![0, 1, 2], vec![1, 1, 2],]
+        );
+
+        let coords = Coords::from_iter(vec![vec![0, 1], vec![1, 2]], 2);
+        let actual = coords.expand(&[3, 2, 5], 1);
+        assert_eq!(
+            actual.to_vec(),
+            vec![vec![0, 0, 1], vec![0, 1, 1], vec![1, 0, 2], vec![1, 1, 2],]
+        );
+
+        let coords = Coords::from_iter(vec![vec![0, 1], vec![1, 2]], 2);
+        let actual = coords.expand(&[3, 5, 2], 2);
+        assert_eq!(
+            actual.to_vec(),
+            vec![vec![0, 1, 0], vec![0, 1, 1], vec![1, 2, 0], vec![1, 2, 1],]
+        );
     }
 }
