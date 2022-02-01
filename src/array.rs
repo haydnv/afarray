@@ -1062,6 +1062,38 @@ impl Array {
         Ok(slice)
     }
 
+    /// Compute the indices needed to sort this `Array`.
+    pub fn argsort(&self, ascending: bool) -> Result<(Self, ArrayExt<u64>)> {
+        macro_rules! argsort {
+            ($arr:expr) => {{
+                let (sorted, indices) = $arr.sort_index(ascending);
+                (sorted.into(), indices.type_cast())
+            }};
+        }
+
+        use Array::*;
+        let (sorted, indices) = match self {
+            Bool(b) => argsort!(b),
+            F32(f) => argsort!(f),
+            F64(f) => argsort!(f),
+            I16(i) => argsort!(i),
+            I32(i) => argsort!(i),
+            I64(i) => argsort!(i),
+            U8(u) => argsort!(u),
+            U16(u) => argsort!(u),
+            U32(u) => argsort!(u),
+            U64(u) => argsort!(u),
+            other => {
+                return Err(error(format!(
+                    "{} does not support ordering",
+                    other.dtype()
+                )))
+            }
+        };
+
+        Ok((sorted, indices))
+    }
+
     /// Sort this `Array` in-place.
     pub fn sort(&mut self, ascending: bool) -> Result<()> {
         use Array::*;
@@ -1994,6 +2026,13 @@ mod tests {
     fn test_product() {
         let a: Array = [1, 2, 3, 4][..].into();
         assert_eq!(a.product(), 24.into());
+    }
+
+    #[test]
+    fn test_argsort() {
+        let a = Array::random_uniform(FloatType::F32, 10);
+        let (sorted, indices) = a.argsort(true).expect("argsort");
+        assert_eq!(sorted, a.get(&indices))
     }
 
     #[tokio::test]

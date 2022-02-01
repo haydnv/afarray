@@ -193,10 +193,16 @@ impl<T: af::HasAfEnum + af::RealNumber + Clone + Default> ArrayExt<T> {
         *self = self.sorted(ascending)
     }
 
+    /// Compute the indices needed to sort this `ArrayExt`.
+    pub fn sort_index(&self, ascending: bool) -> (ArrayExt<T>, ArrayExt<u32>) {
+        let (sorted, indices) = af::sort_index(self, 0, ascending);
+        (sorted.into(), indices.into())
+    }
+
     /// Return a sorted copy of this `ArrayExt`.
     pub fn sorted(&self, ascending: bool) -> Self {
-        debug_assert_eq!(self.0.dims(), dim4(self.len()));
-        Self(af::sort(&self.0, 0, ascending))
+        debug_assert_eq!(self.dims(), dim4(self.len()));
+        Self(af::sort(self, 0, ascending))
     }
 
     /// Return only the unique values from this `ArrayExt`.
