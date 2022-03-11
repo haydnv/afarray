@@ -34,10 +34,12 @@ impl Coords {
     /// Panics: if shape is empty
     pub fn empty(shape: &[u64], size: usize) -> Self {
         assert!(!shape.is_empty());
+        assert!(size > 0);
 
         let ndim = shape.len();
         let dims = af::Dim4::new(&[ndim as u64, size as u64, 1, 1]);
         let array = af::constant(0u64, dims);
+        assert_eq!(array.dims(), dims);
         Self { array, ndim }
     }
 
@@ -177,12 +179,8 @@ impl Coords {
     }
 
     fn split(&self, at: usize) -> (Self, Self) {
+        assert!(at > 0);
         assert!(at < self.len());
-
-        if at == 0 {
-            let shape: Vec<u64> = std::iter::repeat(0).take(self.ndim()).collect();
-            return (Coords::empty(&shape, 0), self.clone());
-        }
 
         let left = af::Seq::new(0., (at - 1) as f32, 1.);
         let right = af::Seq::new(at as f32, (self.len() - 1) as f32, 1.);
@@ -202,7 +200,7 @@ impl Coords {
         )
     }
 
-    fn split_lt(&self, lt: &[u64], shape: &[u64]) -> (Self, Self) {
+    fn split_lte(&self, lt: &[u64], shape: &[u64]) -> (Option<Self>, Option<Self>) {
         assert_eq!(lt.len(), self.ndim);
         assert_eq!(shape.len(), self.ndim);
 
@@ -210,9 +208,21 @@ impl Coords {
         let pivot = coord_to_offset(lt, &coord_bounds);
         let pivot = af::Array::new(&[pivot], dim4(1));
         let offsets = self.to_offsets(shape);
-        let left = af::lt(offsets.deref(), &pivot, true);
-        let (pivot, _) = af::sum_all(&left);
-        self.split(pivot as usize)
+        let left = af::le(offsets.deref(), &pivot, true);
+        let pivot = af::sum_all(&left).0;
+
+        if pivot == 0 {
+            return (None, Some(self.clone()));
+        } else if pivot == self.len() as u32 {
+            return (Some(self.clone()), None);
+        }
+
+        let (l, r) = self.split(pivot as usize);
+
+        debug_assert_eq!(l.array.dims()[0], self.ndim as u64);
+        debug_assert_eq!(r.array.dims()[0], self.ndim as u64);
+
+        (Some(l), Some(r))
     }
 
     fn sorted(&self) -> Self {
@@ -539,7 +549,9 @@ impl fmt::Debug for Coords {
 ///
 /// Assumes all coordinates are unique.
 ///
-/// Panics: if the number of dimensions of `l` or `r` does not match the given `shape`.
+/// Panics:
+///  - if `l` or `r` is empty
+///  - if the number of dimensions of `l` or `r` does not match the given `shape`
 pub fn intersection(l: &Coords, r: &Coords, shape: &[u64]) -> Coords {
     assert_eq!(l.ndim, r.ndim);
     assert_eq!(l.ndim, shape.len());
@@ -686,32 +698,42 @@ where
 
             match ready!(this.left.as_mut().poll_next(cxt)) {
                 Some(Err(cause)) => break Some(Err(cause)),
-                Some(Ok(coords)) => create_or_append(this.pending_left, coords),
+                Some(Ok(coords)) => {
+                    assert_eq!(coords.array.dims()[0], this.shape.len() as u64);
+                    create_or_append(this.pending_left, coords)
+                }
                 None => {}
             };
 
             match ready!(this.right.as_mut().poll_next(cxt)) {
                 Some(Err(cause)) => break Some(Err(cause)),
-                Some(Ok(coords)) => create_or_append(this.pending_right, coords),
+                Some(Ok(coords)) => {
+                    assert_eq!(coords.array.dims()[0], this.shape.len() as u64);
+                    create_or_append(this.pending_right, coords)
+                }
                 None => {}
             };
 
             match (&mut *this.pending_left, &mut *this.pending_right) {
                 (Some(l), Some(r)) if l.last() < r.last() => {
-                    let (r, r_pending) = r.split_lt(&l.last(), this.shape);
-                    *this.pending_right = Some(r_pending);
+                    let (r, r_pending) = r.split_lte(&l.last(), this.shape);
+                    *this.pending_right = r_pending;
 
-                    let coords = intersection(l, &r, this.shape);
-                    create_or_append(this.buffer, coords);
+                    if let Some(r) = r {
+                        let coords = intersection(l, &r, this.shape);
+                        create_or_append(this.buffer, coords);
+                    }
 
                     *this.pending_left = None;
                 }
                 (Some(l), Some(r)) if r.last() < l.last() => {
-                    let (l, l_pending) = l.split_lt(&r.last(), this.shape);
-                    *this.pending_left = Some(l_pending);
+                    let (l, l_pending) = l.split_lte(&r.last(), this.shape);
+                    *this.pending_left = l_pending;
 
-                    let coords = intersection(&l, r, this.shape);
-                    create_or_append(this.buffer, coords);
+                    if let Some(l) = l {
+                        let coords = intersection(&l, r, this.shape);
+                        create_or_append(this.buffer, coords);
+                    }
 
                     *this.pending_right = None;
                 }
@@ -805,18 +827,24 @@ where
 
             match (&mut *this.pending_left, &mut *this.pending_right) {
                 (Some(l), Some(r)) if l.last() < r.last() => {
-                    let (r, r_pending) = r.split_lt(&l.last(), this.shape);
-                    *this.pending_right = Some(r_pending);
-                    create_or_append(this.buffer, r);
+                    let (r, r_pending) = r.split_lte(&l.last(), this.shape);
+                    *this.pending_right = r_pending;
+
+                    if let Some(r) = r {
+                        create_or_append(this.buffer, r);
+                    }
 
                     let mut l = None;
                     mem::swap(this.pending_left, &mut l);
                     create_or_append(this.buffer, l.unwrap());
                 }
                 (Some(l), Some(r)) if r.last() < l.last() => {
-                    let (l, l_pending) = l.split_lt(&r.last(), this.shape);
-                    *this.pending_left = Some(l_pending);
-                    create_or_append(this.buffer, l);
+                    let (l, l_pending) = l.split_lte(&r.last(), this.shape);
+                    *this.pending_left = l_pending;
+
+                    if let Some(l) = l {
+                        create_or_append(this.buffer, l);
+                    }
 
                     let mut r = None;
                     mem::swap(this.pending_right, &mut r);
@@ -934,6 +962,8 @@ fn create_or_append(coords: &mut Option<Coords>, to_append: Coords) {
         return;
     }
 
+    assert!(to_append.dims()[0] > 0);
+
     *coords = match coords {
         Some(coords) => Some(coords.append(&to_append)),
         None => Some(to_append),
@@ -1020,11 +1050,11 @@ mod tests {
         assert_eq!(l.to_vec(), &coord_vec[..1]);
         assert_eq!(r.to_vec(), &coord_vec[1..]);
 
-        let (l, r) = coords.split_lt(&[0, 1, 0], &[2, 2, 2]);
-        assert_eq!(l.to_vec(), &coord_vec[..2]);
-        assert_eq!(r.to_vec(), &coord_vec[2..]);
+        let (l, r) = coords.split_lte(&[0, 1, 0], &[2, 2, 2]);
+        assert_eq!(l.as_ref().expect("left").to_vec(), &coord_vec[..3]);
+        assert_eq!(r.as_ref().expect("right").to_vec(), &coord_vec[3..]);
 
-        let joined = l.append(&r);
+        let joined = l.expect("left").append(r.as_ref().expect("right"));
         assert_eq!(joined.to_vec(), coords.to_vec());
 
         assert_eq!(coords.to_vec(), coords.sorted().to_vec());
