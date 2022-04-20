@@ -773,6 +773,46 @@ impl Array {
         Array::Bool(this.or(&that))
     }
 
+    /// Find the maximum value of each `stride` of this `Array`
+    pub fn reduce_max(&self, stride: u64) -> Result<Array> {
+        if self.len() as u64 % stride != 0 {
+            return Err(error(format!(
+                "cannot reduce an Array of length {} with stride {}",
+                self.len(),
+                stride
+            )));
+        }
+
+        fn reduce_block_dispatch<T: af::HasAfEnum>(block: &ArrayExt<T>, stride: u64) -> Array
+        where
+            Array: From<ArrayExt<T::InType>>,
+        {
+            reduce_block(block, stride, &mut |block| af::max(&block, 0).into()).into()
+        }
+
+        Ok(reduce!(self, reduce_block_dispatch, stride))
+    }
+
+    /// Find the maximum value of each `stride` of this `Array`
+    pub fn reduce_min(&self, stride: u64) -> Result<Array> {
+        if self.len() as u64 % stride != 0 {
+            return Err(error(format!(
+                "cannot reduce an Array of length {} with stride {}",
+                self.len(),
+                stride
+            )));
+        }
+
+        fn reduce_block_dispatch<T: af::HasAfEnum>(block: &ArrayExt<T>, stride: u64) -> Array
+        where
+            Array: From<ArrayExt<T::InType>>,
+        {
+            reduce_block(block, stride, &mut |block| af::min(&block, 0).into()).into()
+        }
+
+        Ok(reduce!(self, reduce_block_dispatch, stride))
+    }
+
     /// Compute the product of each `stride` of this `Array`
     pub fn reduce_product(&self, stride: u64) -> Result<Array> {
         if self.len() as u64 % stride != 0 {
@@ -811,6 +851,38 @@ impl Array {
         }
 
         Ok(reduce!(self, reduce_block_dispatch, stride))
+    }
+
+    /// Find the maximum element in this `Array`.
+    pub fn max(&self) -> Number {
+        fn max<T>(this: &ArrayExt<T>) -> Number
+        where
+            T: af::HasAfEnum + Default,
+            T::AggregateOutType: number_general::DType,
+            T::ProductOutType: number_general::DType,
+            ArrayExt<T>: ArrayInstanceReduce<T>,
+            Number: From<<ArrayExt<T> as ArrayInstanceReduce<T>>::MinMax>,
+        {
+            this.max().into()
+        }
+
+        dispatch!(self, max)
+    }
+
+    /// Find the maximum element in this `Array`.
+    pub fn min(&self) -> Number {
+        fn min<T>(this: &ArrayExt<T>) -> Number
+        where
+            T: af::HasAfEnum + Default,
+            T::AggregateOutType: number_general::DType,
+            T::ProductOutType: number_general::DType,
+            ArrayExt<T>: ArrayInstanceReduce<T>,
+            Number: From<<ArrayExt<T> as ArrayInstanceReduce<T>>::MinMax>,
+        {
+            this.min().into()
+        }
+
+        dispatch!(self, min)
     }
 
     /// Calculate the cumulative product of this `Array`.
@@ -2014,6 +2086,13 @@ mod tests {
         let a: Array = [1.0, 2.0, 3.0][..].into();
         let b: Array = [2][..].into();
         assert_eq!(a.pow(&b), [1.0, 4.0, 9.0][..].into());
+    }
+
+    #[test]
+    fn test_min_and_max() {
+        let a: Array = [3, 1, 4, 2][..].into();
+        assert_eq!(a.min(), 1.into());
+        assert_eq!(a.max(), 4.into());
     }
 
     #[test]

@@ -829,6 +829,13 @@ where
 {
     type Product: af::HasAfEnum;
     type Sum: af::HasAfEnum;
+    type MinMax: af::HasAfEnum;
+
+    /// Find the maximum element.
+    fn max(&self) -> Self::MinMax;
+
+    /// Find the minimum element.
+    fn min(&self) -> Self::MinMax;
 
     /// Calculate the cumulative product.
     fn product(&self) -> T::ProductOutType;
@@ -852,6 +859,15 @@ macro_rules! reduce_real {
         impl ArrayInstanceReduce<$t> for ArrayExt<$t> {
             type Product = <$t as af::HasAfEnum>::ProductOutType;
             type Sum = <$t as af::HasAfEnum>::AggregateOutType;
+            type MinMax = <$t as af::HasAfEnum>::BaseType;
+
+            fn max(&self) -> Self::MinMax {
+                af::max_all(self).0
+            }
+
+            fn min(&self) -> Self::MinMax {
+                af::min_all(self).0
+            }
 
             fn product(&self) -> Self::Product {
                 af::product_all(self).0
@@ -880,6 +896,17 @@ macro_rules! reduce_complex {
         impl ArrayInstanceReduce<Complex<$t>> for ArrayExt<Complex<$t>> {
             type Product = Complex<$t>;
             type Sum = Complex<$t>;
+            type MinMax = Complex<$t>;
+
+            fn max(&self) -> Self::MinMax {
+                let max = af::min_all(self);
+                Complex::new(max.0, max.1)
+            }
+
+            fn min(&self) -> Self::MinMax {
+                let min = af::min_all(self);
+                Complex::new(min.0, min.1)
+            }
 
             fn product(&self) -> Self::Product {
                 let product = af::product_all(self);
