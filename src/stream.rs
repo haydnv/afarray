@@ -1,3 +1,5 @@
+// TODO: rewrite this module using macros
+
 use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
