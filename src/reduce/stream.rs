@@ -54,6 +54,76 @@ where
 {
 }
 
+/// Methods for handling a [`Stream`] of [`ArrayExt`]s.
+pub trait ArraySumTryStream<'a, T, E>
+where
+    T: af::HasAfEnum + HasArrayExt + Copy + Default + Send + 'a,
+    E: Send + 'a,
+    T::AggregateOutType: DType + Sum + Copy + Default + Send + 'a,
+    Self: Stream<Item = Result<ArrayExt<T>, E>> + Sized + Send + Unpin + 'a,
+    ArrayExt<T>: ArrayInstanceSum<T> + From<af::Array<T>>,
+{
+    /// Compute the sum of each `stride` of a [`Stream`] of [`ArrayExt`]s.
+    fn reduce_sum(
+        self,
+        block_size: usize,
+        stride: u64,
+    ) -> Box<dyn Stream<Item = Result<ArrayExt<T::AggregateOutType>, E>> + Send + Unpin + 'a> {
+        reduce(
+            self,
+            block_size,
+            stride,
+            T::zero(),
+            Sum::sum,
+            |block| af::sum(&block, 0).into(),
+            |block| block.sum(),
+        )
+    }
+}
+
+impl<'a, T, E, S> ArraySumTryStream<'a, T, E> for S
+where
+    T: af::HasAfEnum + HasArrayExt + Copy + Default + Send + 'a,
+    E: Send + 'a,
+    S: Stream<Item = Result<ArrayExt<T>, E>> + Sized + Send + Unpin + 'a,
+    T::AggregateOutType: DType + Sum + Copy + Default + Send + 'a,
+    ArrayExt<T>: ArrayInstanceSum<T>,
+{
+}
+
+macro_rules! dispatch {
+    ($call:ident, $dtype:ident, $blocks:ident, $block_size:ident, $stride: ident) => {
+        match $dtype {
+            NT::Bool => $call::<bool, E, S>($blocks, $block_size, $stride),
+            NT::UInt(ut) => match ut {
+                UT::U8 => $call::<u8, E, S>($blocks, $block_size, $stride),
+                UT::U16 => $call::<u16, E, S>($blocks, $block_size, $stride),
+                UT::U32 => $call::<u32, E, S>($blocks, $block_size, $stride),
+                UT::U64 => $call::<u64, E, S>($blocks, $block_size, $stride),
+                UT::UInt => $call::<u64, E, S>($blocks, $block_size, $stride),
+            },
+            NT::Int(it) => match it {
+                IT::I8 => $call::<i16, E, S>($blocks, $block_size, $stride),
+                IT::I16 => $call::<i16, E, S>($blocks, $block_size, $stride),
+                IT::I32 => $call::<i32, E, S>($blocks, $block_size, $stride),
+                IT::I64 => $call::<i64, E, S>($blocks, $block_size, $stride),
+                IT::Int => $call::<i64, E, S>($blocks, $block_size, $stride),
+            },
+            NT::Float(ft) => match ft {
+                FT::F32 => $call::<f32, E, S>($blocks, $block_size, $stride),
+                FT::F64 => $call::<f64, E, S>($blocks, $block_size, $stride),
+                FT::Float => $call::<f64, E, S>($blocks, $block_size, $stride),
+            },
+            NT::Complex(ct) => match ct {
+                CT::C32 => $call::<Complex<f32>, E, S>($blocks, $block_size, $stride),
+                CT::C64 => $call::<Complex<f64>, E, S>($blocks, $block_size, $stride),
+                CT::Complex => $call::<Complex<f64>, E, S>($blocks, $block_size, $stride),
+            },
+            NT::Number => $call::<f64, E, S>($blocks, $block_size, $stride),
+        }
+    };
+}
+
 /// Compute the product of each `stride` of a [`Stream`] of [`Array`]s.
 pub fn reduce_product<'a, E, S>(
     blocks: S,
@@ -67,34 +137,7 @@ where
 {
     use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
 
-    match dtype {
-        NT::Bool => reduce_product_inner::<bool, E, S>(blocks, block_size, stride),
-        NT::UInt(ut) => match ut {
-            UT::U8 => reduce_product_inner::<u8, E, S>(blocks, block_size, stride),
-            UT::U16 => reduce_product_inner::<u16, E, S>(blocks, block_size, stride),
-            UT::U32 => reduce_product_inner::<u32, E, S>(blocks, block_size, stride),
-            UT::U64 => reduce_product_inner::<u64, E, S>(blocks, block_size, stride),
-            UT::UInt => reduce_product_inner::<u64, E, S>(blocks, block_size, stride),
-        },
-        NT::Int(it) => match it {
-            IT::I8 => reduce_product_inner::<i16, E, S>(blocks, block_size, stride),
-            IT::I16 => reduce_product_inner::<i16, E, S>(blocks, block_size, stride),
-            IT::I32 => reduce_product_inner::<i32, E, S>(blocks, block_size, stride),
-            IT::I64 => reduce_product_inner::<i64, E, S>(blocks, block_size, stride),
-            IT::Int => reduce_product_inner::<i64, E, S>(blocks, block_size, stride),
-        },
-        NT::Float(ft) => match ft {
-            FT::F32 => reduce_product_inner::<f32, E, S>(blocks, block_size, stride),
-            FT::F64 => reduce_product_inner::<f64, E, S>(blocks, block_size, stride),
-            FT::Float => reduce_product_inner::<f64, E, S>(blocks, block_size, stride),
-        },
-        NT::Complex(ct) => match ct {
-            CT::C32 => reduce_product_inner::<Complex<f32>, E, S>(blocks, block_size, stride),
-            CT::C64 => reduce_product_inner::<Complex<f64>, E, S>(blocks, block_size, stride),
-            CT::Complex => reduce_product_inner::<Complex<f64>, E, S>(blocks, block_size, stride),
-        },
-        NT::Number => reduce_product_inner::<f64, E, S>(blocks, block_size, stride),
-    }
+    dispatch!(reduce_product_inner, dtype, blocks, block_size, stride)
 }
 
 fn reduce_product_inner<'a, T, E, S>(
@@ -112,6 +155,40 @@ where
 {
     let blocks = blocks.map_ok(|block| block.type_cast::<T>());
     let reduced = blocks.reduce_product(block_size, stride);
+    Box::new(reduced.map_ok(Array::from))
+}
+
+/// Compute the sum of each `stride` of a [`Stream`] of [`Array`]s.
+pub fn reduce_sum<'a, E, S>(
+    blocks: S,
+    dtype: NumberType,
+    block_size: usize,
+    stride: u64,
+) -> Box<dyn Stream<Item = Result<Array, E>> + Send + Unpin + 'a>
+where
+    E: Send + 'a,
+    S: Stream<Item = Result<Array, E>> + Send + Unpin + 'a,
+{
+    use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
+
+    dispatch!(reduce_sum_inner, dtype, blocks, block_size, stride)
+}
+
+fn reduce_sum_inner<'a, T, E, S>(
+    blocks: S,
+    block_size: usize,
+    stride: u64,
+) -> Box<dyn Stream<Item = Result<Array, E>> + Send + Unpin + 'a>
+where
+    T: af::HasAfEnum + HasArrayExt + Copy + Default + Send + 'a,
+    E: Send + 'a,
+    S: Stream<Item = Result<Array, E>> + Sized + Send + Unpin + 'a,
+    T::AggregateOutType: DType + Sum + Copy + Default + Send + 'a,
+    ArrayExt<T>: ArrayInstanceSum<T>,
+    Array: From<ArrayExt<T::AggregateOutType>>,
+{
+    let blocks = blocks.map_ok(|block| block.type_cast::<T>());
+    let reduced = blocks.reduce_sum(block_size, stride);
     Box::new(reduced.map_ok(Array::from))
 }
 
