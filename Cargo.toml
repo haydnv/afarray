@@ -14,7 +14,7 @@ keywords = ["array", "arrayfire", "gpu", "ndarray", "tensor"]
 [dependencies]
 arrayfire = "3.8"
 async-trait = "0.1"
-collate = { path = "../collate", features=["complex"] }
+collate = { version = "~0.2.3", features=["complex"] }
 destream = "0.5"
 futures = "0.3"
 num-complex = "0.2"
