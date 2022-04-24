@@ -820,30 +820,13 @@ where
     }
 }
 
-/// Defines common reduction operations `product` and `sum`.
-pub trait ArrayInstanceReduce<T>: ArrayInstance
+/// Defines common reduction operation `sum`.
+pub trait ArrayInstanceSum<T>: ArrayInstance
 where
     T: af::HasAfEnum,
     T::AggregateOutType: DType,
-    T::ProductOutType: DType,
 {
-    type Product: af::HasAfEnum;
     type Sum: af::HasAfEnum;
-    type MinMax: af::HasAfEnum;
-
-    /// Find the maximum element.
-    fn max(&self) -> Self::MinMax;
-
-    /// Find the minimum element.
-    fn min(&self) -> Self::MinMax;
-
-    /// Calculate the cumulative product.
-    fn product(&self) -> T::ProductOutType;
-
-    /// The `NumberType` of the product of this array.
-    fn product_dtype() -> NumberType {
-        T::ProductOutType::dtype()
-    }
 
     /// Calculate the cumulative sum.
     fn sum(&self) -> T::AggregateOutType;
@@ -854,11 +837,58 @@ where
     }
 }
 
+/// Defines common reduction operation `product`.
+pub trait ArrayInstanceProduct<T>: ArrayInstance
+where
+    T: af::HasAfEnum,
+    T::ProductOutType: DType,
+{
+    type Product: af::HasAfEnum;
+
+    /// Calculate the cumulative product.
+    fn product(&self) -> T::ProductOutType;
+
+    /// The `NumberType` of the product of this array.
+    fn product_dtype() -> NumberType {
+        T::ProductOutType::dtype()
+    }
+}
+
+/// Defines common reduction operations `min` and `max`.
+pub trait ArrayInstanceMinMax<T>: ArrayInstance
+where
+    T: af::HasAfEnum,
+    T::AggregateOutType: DType,
+    T::ProductOutType: DType,
+{
+    type MinMax: af::HasAfEnum;
+
+    /// Find the maximum element.
+    fn max(&self) -> Self::MinMax;
+
+    /// Find the minimum element.
+    fn min(&self) -> Self::MinMax;
+}
+
 macro_rules! reduce_real {
     ($t:ty) => {
-        impl ArrayInstanceReduce<$t> for ArrayExt<$t> {
-            type Product = <$t as af::HasAfEnum>::ProductOutType;
+        impl ArrayInstanceSum<$t> for ArrayExt<$t> {
             type Sum = <$t as af::HasAfEnum>::AggregateOutType;
+
+            fn sum(&self) -> Self::Sum {
+                af::sum_all(self).0
+            }
+        }
+
+        impl ArrayInstanceProduct<$t> for ArrayExt<$t> {
+            type Product = <$t as af::HasAfEnum>::ProductOutType;
+
+            fn product(&self) -> Self::Product {
+                af::product_all(self).0
+            }
+        }
+
+        impl ArrayInstanceMinMax<$t> for ArrayExt<$t> {
             type MinMax = <$t as af::HasAfEnum>::BaseType;
 
             fn max(&self) -> Self::MinMax {
@@ -867,14 +897,6 @@ macro_rules! reduce_real {
 
             fn min(&self) -> Self::MinMax {
                 af::min_all(self).0
-            }
-
-            fn product(&self) -> Self::Product {
-                af::product_all(self).0
-            }
-
-            fn sum(&self) -> Self::Sum {
-                af::sum_all(self).0
             }
         }
     };
@@ -893,9 +915,25 @@ reduce_real!(f64);
 
 macro_rules! reduce_complex {
     ($t:ty) => {
-        impl ArrayInstanceReduce<Complex<$t>> for ArrayExt<Complex<$t>> {
-            type Product = Complex<$t>;
+        impl ArrayInstanceSum<Complex<$t>> for ArrayExt<Complex<$t>> {
             type Sum = Complex<$t>;
+
+            fn sum(&self) -> Self::Sum {
+                let sum = af::sum_all(self);
+                Complex::new(sum.0, sum.1)
+            }
+        }
+
+        impl ArrayInstanceProduct<Complex<$t>> for ArrayExt<Complex<$t>> {
+            type Product = Complex<$t>;
+
+            fn product(&self) -> Self::Product {
+                let product = af::product_all(self);
+                Complex::new(product.0, product.1)
+            }
+        }
+
+        impl ArrayInstanceMinMax<Complex<$t>> for ArrayExt<Complex<$t>> {
             type MinMax = Complex<$t>;
 
             fn max(&self) -> Self::MinMax {
@@ -906,16 +944,6 @@ macro_rules! reduce_complex {
             fn min(&self) -> Self::MinMax {
                 let min = af::min_all(self);
                 Complex::new(min.0, min.1)
-            }
-
-            fn product(&self) -> Self::Product {
-                let product = af::product_all(self);
-                Complex::new(product.0, product.1)
-            }
-
-            fn sum(&self) -> Self::Sum {
-                let sum = af::sum_all(self);
-                Complex::new(sum.0, sum.1)
             }
         }
     };

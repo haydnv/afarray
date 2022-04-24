@@ -860,8 +860,8 @@ impl Array {
             T: af::HasAfEnum + Default,
             T::AggregateOutType: number_general::DType,
             T::ProductOutType: number_general::DType,
-            ArrayExt<T>: ArrayInstanceReduce<T>,
-            Number: From<<ArrayExt<T> as ArrayInstanceReduce<T>>::MinMax>,
+            ArrayExt<T>: ArrayInstanceMinMax<T>,
+            Number: From<<ArrayExt<T> as ArrayInstanceMinMax<T>>::MinMax>,
         {
             this.max().into()
         }
@@ -876,8 +876,8 @@ impl Array {
             T: af::HasAfEnum + Default,
             T::AggregateOutType: number_general::DType,
             T::ProductOutType: number_general::DType,
-            ArrayExt<T>: ArrayInstanceReduce<T>,
-            Number: From<<ArrayExt<T> as ArrayInstanceReduce<T>>::MinMax>,
+            ArrayExt<T>: ArrayInstanceMinMax<T>,
+            Number: From<<ArrayExt<T> as ArrayInstanceMinMax<T>>::MinMax>,
         {
             this.min().into()
         }
@@ -892,7 +892,7 @@ impl Array {
             T: af::HasAfEnum + Default,
             T::AggregateOutType: number_general::DType,
             T::ProductOutType: number_general::DType,
-            ArrayExt<T>: ArrayInstanceReduce<T>,
+            ArrayExt<T>: ArrayInstanceProduct<T>,
             Number: From<T::ProductOutType>,
         {
             this.product().into()
@@ -908,7 +908,7 @@ impl Array {
             T: af::HasAfEnum + Default,
             T::AggregateOutType: number_general::DType,
             T::ProductOutType: number_general::DType,
-            ArrayExt<T>: ArrayInstanceReduce<T>,
+            ArrayExt<T>: ArrayInstanceSum<T>,
             Number: From<T::AggregateOutType>,
         {
             this.sum().into()
@@ -1942,7 +1942,7 @@ impl<'en> en::IntoStream<'en> for DType {
     }
 }
 
-pub(super) fn reduce_block<T, B, R>(block: &ArrayExt<T>, stride: u64, reduce: &mut R) -> ArrayExt<B>
+pub(crate) fn reduce_block<T, B, R>(block: &ArrayExt<T>, stride: u64, reduce: &mut R) -> ArrayExt<B>
 where
     T: af::HasAfEnum,
     B: af::HasAfEnum,
