@@ -13,7 +13,7 @@ use crate::ext::{
     HasArrayExt,
 };
 use crate::stream::{Aggregate, ArrayTryStream, Resize};
-use crate::Complex;
+use crate::{Complex, Max, Min};
 
 use super::{Product, Sum};
 
@@ -36,7 +36,7 @@ where
             self,
             block_size,
             stride,
-            T::one(),
+            T::product_one(),
             Product::product,
             |block| af::product(&block, 0).into(),
             |block| block.product(),
@@ -54,7 +54,7 @@ where
 {
 }
 
-/// Methods for handling a [`Stream`] of [`ArrayExt`]s.
+/// Trait to reduce the sum of a [`Stream`] of [`ArrayExt`]s.
 pub trait ArraySumTryStream<'a, T, E>
 where
     T: af::HasAfEnum + HasArrayExt + Copy + Default + Send + 'a,
@@ -73,7 +73,7 @@ where
             self,
             block_size,
             stride,
-            T::zero(),
+            T::zero_sum(),
             Sum::sum,
             |block| af::sum(&block, 0).into(),
             |block| block.sum(),
@@ -88,6 +88,60 @@ where
     S: Stream<Item = Result<ArrayExt<T>, E>> + Sized + Send + Unpin + 'a,
     T::AggregateOutType: DType + Sum + Copy + Default + Send + 'a,
     ArrayExt<T>: ArrayInstanceSum<T>,
+{
+}
+
+/// Trait to reduce the sum of a [`Stream`] of [`ArrayExt`]s.
+pub trait ArrayMinMaxTryStream<'a, T, E>
+where
+    T: af::HasAfEnum + HasArrayExt + Copy + Default + Send + 'a,
+    T: DType + Max + Min + Copy + Default + Send + 'a,
+    E: Send + 'a,
+    Self: Stream<Item = Result<ArrayExt<T>, E>> + Sized + Send + Unpin + 'a,
+    ArrayExt<T>: ArrayInstanceMinMax<T> + From<af::Array<T>> + From<af::Array<T::InType>>,
+{
+    /// Compute the maximum of each `stride` of a [`Stream`] of [`ArrayExt`]s.
+    fn reduce_max(
+        self,
+        block_size: usize,
+        stride: u64,
+    ) -> Box<dyn Stream<Item = Result<ArrayExt<T>, E>> + Send + Unpin + 'a> {
+        reduce(
+            self,
+            block_size,
+            stride,
+            T::zero_cmp(),
+            Max::max,
+            |block| af::max(&block, 0).into(),
+            |block| block.max(),
+        )
+    }
+
+    /// Compute the minimum of each `stride` of a [`Stream`] of [`ArrayExt`]s.
+    fn reduce_min(
+        self,
+        block_size: usize,
+        stride: u64,
+    ) -> Box<dyn Stream<Item = Result<ArrayExt<T>, E>> + Send + Unpin + 'a> {
+        reduce(
+            self,
+            block_size,
+            stride,
+            T::zero_cmp(),
+            Min::min,
+            |block| af::min(&block, 0).into(),
+            |block| block.min(),
+        )
+    }
+}
+
+impl<'a, T, E, S> ArrayMinMaxTryStream<'a, T, E> for S
+where
+    T: af::HasAfEnum + HasArrayExt + Copy + Default + Send + 'a,
+    T: DType + Max + Min + Copy + Default + Send + 'a,
+    E: Send + 'a,
+    S: Stream<Item = Result<ArrayExt<T>, E>> + Sized + Send + Unpin + 'a,
+    ArrayExt<T>: ArrayInstanceMinMax<T> + From<af::Array<T::InType>>,
 {
 }
 
@@ -189,6 +243,72 @@ where
 {
     let blocks = blocks.map_ok(|block| block.type_cast::<T>());
     let reduced = blocks.reduce_sum(block_size, stride);
+    Box::new(reduced.map_ok(Array::from))
+}
+
+/// Compute the maximum of each `stride` of a [`Stream`] of [`Array`]s.
+pub fn reduce_max<'a, E, S>(
+    blocks: S,
+    dtype: NumberType,
+    block_size: usize,
+    stride: u64,
+) -> Box<dyn Stream<Item = Result<Array, E>> + Send + Unpin + 'a>
+where
+    E: Send + 'a,
+    S: Stream<Item = Result<Array, E>> + Send + Unpin + 'a,
+{
+    use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
+
+    dispatch!(reduce_max_inner, dtype, blocks, block_size, stride)
+}
+
+fn reduce_max_inner<'a, T, E, S>(
+    blocks: S,
+    block_size: usize,
+    stride: u64,
+) -> Box<dyn Stream<Item = Result<Array, E>> + Send + Unpin + 'a>
+where
+    T: af::HasAfEnum + HasArrayExt + DType + Max + Min + Copy + Default + Send + 'a,
+    E: Send + 'a,
+    S: Stream<Item = Result<Array, E>> + Sized + Send + Unpin + 'a,
+    ArrayExt<T>: ArrayInstanceMinMax<T> + From<af::Array<T::InType>>,
+    Array: From<ArrayExt<T>>,
+{
+    let blocks = blocks.map_ok(|block| block.type_cast::<T>());
+    let reduced = blocks.reduce_max(block_size, stride);
+    Box::new(reduced.map_ok(Array::from))
+}
+
+/// Compute the minimum of each `stride` of a [`Stream`] of [`Array`]s.
+pub fn reduce_min<'a, E, S>(
+    blocks: S,
+    dtype: NumberType,
+    block_size: usize,
+    stride: u64,
+) -> Box<dyn Stream<Item = Result<Array, E>> + Send + Unpin + 'a>
+where
+    E: Send + 'a,
+    S: Stream<Item = Result<Array, E>> + Send + Unpin + 'a,
+{
+    use {ComplexType as CT, FloatType as FT, IntType as IT, NumberType as NT, UIntType as UT};
+
+    dispatch!(reduce_min_inner, dtype, blocks, block_size, stride)
+}
+
+fn reduce_min_inner<'a, T, E, S>(
+    blocks: S,
+    block_size: usize,
+    stride: u64,
+) -> Box<dyn Stream<Item = Result<Array, E>> + Send + Unpin + 'a>
+where
+    T: af::HasAfEnum + HasArrayExt + DType + Max + Min + Copy + Default + Send + 'a,
+    E: Send + 'a,
+    S: Stream<Item = Result<Array, E>> + Sized + Send + Unpin + 'a,
+    ArrayExt<T>: ArrayInstanceMinMax<T> + From<af::Array<T::InType>>,
+    Array: From<ArrayExt<T>>,
+{
+    let blocks = blocks.map_ok(|block| block.type_cast::<T>());
+    let reduced = blocks.reduce_max(block_size, stride);
     Box::new(reduced.map_ok(Array::from))
 }
 

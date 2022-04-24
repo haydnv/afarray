@@ -4,11 +4,10 @@ use std::task::{Context, Poll};
 
 use arrayfire as af;
 use futures::ready;
-use futures::stream::{Fuse, Stream, StreamExt, TryStreamExt};
-use number_general::*;
+use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 
-use crate::{Array, ArrayExt, ArrayInstance, Complex, HasArrayExt};
+use crate::{ArrayExt, ArrayInstance, HasArrayExt};
 
 /// Methods for handling a [`Stream`] of [`ArrayExt`]s.
 pub trait ArrayTryStream<'a, T, E>

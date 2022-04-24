@@ -861,7 +861,7 @@ impl Array {
             T::AggregateOutType: number_general::DType,
             T::ProductOutType: number_general::DType,
             ArrayExt<T>: ArrayInstanceMinMax<T>,
-            Number: From<<ArrayExt<T> as ArrayInstanceMinMax<T>>::MinMax>,
+            Number: From<T>,
         {
             this.max().into()
         }
@@ -877,7 +877,7 @@ impl Array {
             T::AggregateOutType: number_general::DType,
             T::ProductOutType: number_general::DType,
             ArrayExt<T>: ArrayInstanceMinMax<T>,
-            Number: From<<ArrayExt<T> as ArrayInstanceMinMax<T>>::MinMax>,
+            Number: From<T>,
         {
             this.min().into()
         }
