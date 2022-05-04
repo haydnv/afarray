@@ -545,23 +545,6 @@ impl fmt::Debug for Coords {
     }
 }
 
-/// Compute the intersection of two `Coords` blocks.
-///
-/// Assumes all coordinates are unique.
-///
-/// Panics:
-///  - if `l` or `r` is empty
-///  - if the number of dimensions of `l` or `r` does not match the given `shape`
-pub fn intersection(l: &Coords, r: &Coords, shape: &[u64]) -> Coords {
-    assert_eq!(l.ndim, r.ndim);
-    assert_eq!(l.ndim, shape.len());
-
-    let left = l.to_offsets(shape);
-    let right = r.to_offsets(shape);
-    let set = af::set_intersect(&left, &right, true);
-    Coords::from_offsets(set.into(), shape)
-}
-
 /// A [`Stream`] of [`Coords`], as constructed from an input stream of [`Coord`]s.
 pub struct CoordBlocks<S> {
     source: Fuse<S>,
@@ -626,129 +609,6 @@ impl<E, S: Stream<Item = Result<Coord, E>> + Unpin> Stream for CoordBlocks<S> {
 impl<E, S: Stream<Item = Result<Coord, E>> + Unpin> FusedStream for CoordBlocks<S> {
     fn is_terminated(&self) -> bool {
         self.source.is_terminated() && self.buffer.is_empty()
-    }
-}
-
-/// Stream for computing the intersection of two [`CoordBlocks`] streams.
-///
-/// The behavior of `CoordIntersect` is undefined if the inputs streams are not sorted.
-#[pin_project]
-pub struct CoordIntersect<L, R> {
-    #[pin]
-    left: Fuse<L>,
-
-    #[pin]
-    right: Fuse<R>,
-
-    pending_left: Option<Coords>,
-    pending_right: Option<Coords>,
-    buffer: Option<Coords>,
-    shape: Vec<u64>,
-    block_size: usize,
-}
-
-impl<L: Stream, R: Stream> CoordIntersect<L, R> {
-    /// Construct a new `CoordIntersect` stream.
-    ///
-    /// Panics: if `block_size` is zero or the dimensions of `left` and `right` don't match.
-    pub fn new(left: L, right: R, shape: Vec<u64>, block_size: usize) -> Self {
-        assert!(block_size > 0);
-
-        Self {
-            left: left.fuse(),
-            right: right.fuse(),
-            pending_left: None,
-            pending_right: None,
-            buffer: None,
-            shape,
-            block_size,
-        }
-    }
-}
-
-impl<E, L, R> Stream for CoordIntersect<L, R>
-where
-    L: Stream<Item = Result<Coords, E>> + Unpin,
-    R: Stream<Item = Result<Coords, E>> + Unpin,
-{
-    type Item = Result<Coords, E>;
-
-    fn poll_next(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut this = self.project();
-
-        Poll::Ready(loop {
-            if let Some(buffer) = this.buffer {
-                if buffer.len() == *this.block_size {
-                    let mut block = None;
-                    mem::swap(this.buffer, &mut block);
-                    break block.map(Ok);
-                } else if buffer.len() > *this.block_size {
-                    let (block, new_buffer) = buffer.split(*this.block_size);
-                    *this.buffer = Some(new_buffer);
-                    break Some(Ok(block));
-                }
-            }
-
-            if this.left.is_terminated() || this.right.is_terminated() {
-                // there can't possibly be any more coordinates to compute the intersection of
-                let mut block = None;
-                mem::swap(this.buffer, &mut block);
-                break block.map(Ok);
-            }
-
-            match ready!(this.left.as_mut().poll_next(cxt)) {
-                Some(Err(cause)) => break Some(Err(cause)),
-                Some(Ok(coords)) => {
-                    assert_eq!(coords.array.dims()[0], this.shape.len() as u64);
-                    create_or_append(this.pending_left, coords)
-                }
-                None => {}
-            };
-
-            match ready!(this.right.as_mut().poll_next(cxt)) {
-                Some(Err(cause)) => break Some(Err(cause)),
-                Some(Ok(coords)) => {
-                    assert_eq!(coords.array.dims()[0], this.shape.len() as u64);
-                    create_or_append(this.pending_right, coords)
-                }
-                None => {}
-            };
-
-            match (&mut *this.pending_left, &mut *this.pending_right) {
-                (Some(l), Some(r)) if l.last() < r.last() => {
-                    let (r, r_pending) = r.split_lte(&l.last(), this.shape);
-                    *this.pending_right = r_pending;
-
-                    if let Some(r) = r {
-                        let coords = intersection(l, &r, this.shape);
-                        create_or_append(this.buffer, coords);
-                    }
-
-                    *this.pending_left = None;
-                }
-                (Some(l), Some(r)) if r.last() < l.last() => {
-                    let (l, l_pending) = l.split_lte(&r.last(), this.shape);
-                    *this.pending_left = l_pending;
-
-                    if let Some(l) = l {
-                        let coords = intersection(&l, r, this.shape);
-                        create_or_append(this.buffer, coords);
-                    }
-
-                    *this.pending_right = None;
-                }
-                (Some(l), Some(r)) => {
-                    assert_eq!(l.last(), r.last());
-
-                    let coords = intersection(l, r, this.shape);
-                    create_or_append(this.buffer, coords);
-
-                    *this.pending_left = None;
-                    *this.pending_right = None;
-                }
-                _ => {} // not enough information to do anything in this case
-            }
-        })
     }
 }
 
@@ -1014,14 +874,6 @@ fn index_set(subject: &mut af::Array<u64>, index: &[u64], value: &af::Array<u64>
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_intersection() {
-        let shape = [5, 2];
-        let offsets = ArrayExt::range(0, 5);
-        let coords = Coords::from_offsets(offsets, &shape);
-        assert_eq!(intersection(&coords, &coords, &shape), coords);
-    }
 
     #[test]
     fn test_to_coords() {
