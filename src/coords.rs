@@ -260,34 +260,38 @@ impl Coords {
         let ndim = self.ndim + 1;
         let reduce_dim = source_shape[reduce_axis];
 
-        let dims = af::Dim4::new(&[1, reduce_dim, 1, 1]);
-        let reduced = af::range(dims, 1);
+        let coords = af::tile(&self.array, af::dim4!(reduce_dim));
+        let coords = af::sort(&coords, 0, true);
 
-        let reduce_index = vec![reduce_axis as u64];
+        let reduced = af::range::<u64>(af::dim4!(reduce_dim), 0);
+        let reduced = af::tile(&reduced, af::dim4!(self.dims()[0]));
+
+        let mut expanded = af::constant(0u64, af::dim4!(self.dims()[0] * reduce_dim, ndim as u64));
 
         let index: Vec<u64> = (0..self.ndim)
             .map(|x| if x < reduce_axis { x } else { x + 1 })
             .map(|x| x as u64)
             .collect();
 
-        let tile_dims = af::Dim4::new(&[1, reduce_dim, 1, 1]);
-        let source_coord_dims = af::Dim4::new(&[ndim as u64, reduce_dim, 1, 1]);
+        let index = af::Array::new(&index, af::dim4!(self.ndim as u64));
 
-        let mut expanded = Vec::with_capacity(self.len());
-        for i in 0..self.dims()[1] {
-            let i = i as f64;
-            let seqs = &[af::Seq::default(), af::Seq::new(i, i, 1.0)];
-            let coord = af::index(&self.array, seqs);
-            let coord = af::tile(&coord, tile_dims);
+        let seq = af::Seq::<f32>::default();
+        let mut indexer = af::Indexer::default();
+        indexer.set_index(&seq, 0, Some(false));
+        indexer.set_index(&index, 1, Some(false));
+        af::assign_gen(&mut expanded, &indexer, &coords);
 
-            let mut expanded_coord = af::constant(0, source_coord_dims);
-            index_set(&mut expanded_coord, &index, &coord);
-            index_set(&mut expanded_coord, &reduce_index, &reduced);
-            expanded.push(expanded_coord);
-        }
+        af::assign_seq(
+            &mut expanded,
+            &[
+                af::Seq::default(),
+                af::seq!(reduce_axis as i32, reduce_axis as i32, 1),
+            ],
+            &reduced,
+        );
 
         Self {
-            array: af::join_many(1, expanded.iter().collect()),
+            array: af::transpose(&expanded, false),
             ndim,
         }
     }
