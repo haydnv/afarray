@@ -11,7 +11,7 @@ use number_general::{DType, NumberType};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use super::{dim4, Complex};
+use super::Complex;
 
 /// Convenience methods defining the base value of a reduce operation on an `ArrayExt`.
 pub trait HasArrayExt
@@ -95,8 +95,8 @@ pub trait ArrayInstance: Deref<Target = af::Array<Self::DType>> + DerefMut {
 
     /// Set the value at the specified index to `value`.
     fn set_at(&mut self, offset: usize, value: Self::DType) {
-        let seq = af::Seq::new(offset as f32, offset as f32, 1.0f32);
-        af::assign_seq(self, &[seq], &af::Array::new(&[value], dim4(1)));
+        let seq = af::seq!(offset as i32, offset as i32, 1);
+        af::assign_seq(self, &[seq], &af::Array::new(&[value], af::dim4!(1)));
     }
 
     /// Copy the data in this [`af::Array`] into a new `Vec`.
@@ -120,7 +120,7 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     where
         T: af::ConstGenerator<OutType = T>,
     {
-        let dim = dim4(length);
+        let dim = af::dim4!(length as u64);
         Self(af::constant(value, dim))
     }
 
@@ -148,7 +148,7 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     pub fn get_value(&self, index: usize) -> T {
         debug_assert!(index < self.elements());
 
-        let af_value = af::index(self, &[af::Seq::new(index as f64, index as f64, 1f64)]);
+        let af_value = af::index(self, &[af::seq!(index as i32, index as i32, 1)]);
         if af_value.elements() == 1 {
             let mut value = vec![T::default()];
             af_value.host(&mut value);
@@ -167,16 +167,16 @@ impl<T: af::HasAfEnum + Default> ArrayExt<T> {
     ///
     /// Panics: if `end` is out of bounds
     pub fn slice(&self, start: usize, end: usize) -> Self {
-        af::index(self, &[af::Seq::new(start as f32, (end - 1) as f32, 1.)]).into()
+        af::index(self, &[af::seq!(start as i32, (end - 1) as i32, 1)]).into()
     }
 
     /// Split this `ArrayExt<T>` into two new instances at the given pivot.
     pub fn split(&self, at: usize) -> (Self, Self) {
-        let left = af::Seq::new(0.0, at as f32, 1.0);
-        let right = af::Seq::new(at as f32, self.len() as f32, 1.0);
+        let left = af::seq!(0, at as i32, 1);
+        let right = af::seq!(at as i32, self.len() as i32, 1);
         (
-            ArrayExt(af::index(self, &[left, af::Seq::default()])),
-            ArrayExt(af::index(self, &[right, af::Seq::default()])),
+            ArrayExt(af::index(self, &[left, af::seq!()])),
+            ArrayExt(af::index(self, &[right, af::seq!()])),
         )
     }
 
@@ -218,7 +218,7 @@ impl<T: af::HasAfEnum + af::RealNumber + Clone + Default> ArrayExt<T> {
 
     /// Return a sorted copy of this `ArrayExt`.
     pub fn sorted(&self, ascending: bool) -> Self {
-        debug_assert_eq!(self.dims(), dim4(self.len()));
+        debug_assert_eq!(self.dims(), af::dim4!(self.len() as u64));
         Self(af::sort(self, 0, ascending))
     }
 
@@ -233,14 +233,14 @@ impl<T: af::HasAfEnum + af::RealNumber + Clone + Default> ArrayExt<T> {
 impl<T: af::HasAfEnum + af::FloatingPoint + Default> ArrayExt<T> {
     /// Construct a new `ArrayExt` with a random normal distribution.
     pub fn random_normal(length: usize) -> Self {
-        let dim = dim4(length);
+        let dim = af::dim4!(length as u64);
         let engine = af::get_default_random_engine();
         Self(af::random_normal(dim, &engine))
     }
 
     /// Construct a new `ArrayExt` with a uniform random distribution.
     pub fn random_uniform(length: usize) -> Self {
-        let dim = dim4(length);
+        let dim = af::dim4!(length as u64);
         let engine = af::get_default_random_engine();
         Self(af::random_uniform(dim, &engine))
     }
@@ -317,13 +317,13 @@ impl ArrayExt<Complex<f64>> {
 impl ArrayExt<u64> {
     /// Construct a new `ArrayExt<u64>` with elements `start..end`.
     pub fn range(start: u64, end: u64) -> Self {
-        let dims = dim4((end - start) as usize);
-        let tile = dim4(1);
+        let dims = af::dim4!((end - start));
+        let tile = af::dim4!(1);
         let range: af::Array<u64> = af::iota(dims, tile).into();
         if start == 0 {
             range.into()
         } else {
-            af::add(&range, &af::Array::new(&[start], dim4(1)), true).into()
+            af::add(&range, &af::Array::new(&[start], af::dim4!(1)), true).into()
         }
     }
 }
@@ -506,7 +506,7 @@ impl<T: af::HasAfEnum> From<af::Array<T>> for ArrayExt<T> {
 
 impl<T: af::HasAfEnum> From<&[T]> for ArrayExt<T> {
     fn from(values: &[T]) -> ArrayExt<T> {
-        let dim = dim4(values.len());
+        let dim = af::dim4!(values.len() as u64);
         ArrayExt(af::Array::new(values, dim))
     }
 }
@@ -520,7 +520,7 @@ impl<T: af::HasAfEnum> From<Vec<T>> for ArrayExt<T> {
 impl<T: af::HasAfEnum> FromIterator<T> for ArrayExt<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let values = Vec::from_iter(iter);
-        let dim = dim4(values.len());
+        let dim = af::dim4!(values.len() as u64);
         ArrayExt(af::Array::new(&values, dim))
     }
 }

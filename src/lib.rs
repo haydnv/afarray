@@ -80,11 +80,6 @@ fn error<I: fmt::Display>(message: I) -> ArrayError {
 }
 
 #[inline]
-fn dim4(size: usize) -> arrayfire::Dim4 {
-    arrayfire::Dim4::new(&[size as u64, 1, 1, 1])
-}
-
-#[inline]
 fn coord_bounds(shape: &[u64]) -> Vec<u64> {
     (0..shape.len())
         .map(|axis| shape[axis + 1..].iter().product())

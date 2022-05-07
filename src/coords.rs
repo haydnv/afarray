@@ -11,7 +11,7 @@ use futures::ready;
 use futures::stream::{Fuse, FusedStream, Stream, StreamExt, TryStream, TryStreamExt};
 use pin_project::pin_project;
 
-use super::{coord_bounds, dim4, ArrayExt};
+use super::{coord_bounds, ArrayExt};
 
 /// An n-dimensional coordinate.
 pub type Coord = Vec<u64>;
@@ -159,9 +159,9 @@ impl Coords {
     }
 
     fn last(&self) -> Coord {
-        let i = (self.len() - 1) as f32;
-        let dim0 = af::Seq::new(0., (self.ndim - 1) as f32, 1.);
-        let dim1 = af::Seq::new(i, i, 1.);
+        let i = (self.len() - 1) as i32;
+        let dim0 = af::seq!(0, (self.ndim - 1) as i32, 1);
+        let dim1 = af::seq!(i, i, 1);
         let slice = af::index(self, &[dim0, dim1]);
         let mut first = vec![0; self.ndim];
         slice.host(&mut first);
@@ -182,11 +182,11 @@ impl Coords {
         assert!(at > 0);
         assert!(at < self.len());
 
-        let left = af::Seq::new(0., (at - 1) as f32, 1.);
-        let right = af::Seq::new(at as f32, (self.len() - 1) as f32, 1.);
+        let left = af::seq!(0, (at - 1) as i32, 1);
+        let right = af::seq!(at as i32, (self.len() - 1) as i32, 1);
 
-        let left = af::index(self, &[af::Seq::default(), left]);
-        let right = af::index(self, &[af::Seq::default(), right]);
+        let left = af::index(self, &[af::seq!(), left]);
+        let right = af::index(self, &[af::seq!(), right]);
 
         (
             Self {
@@ -206,7 +206,7 @@ impl Coords {
 
         let coord_bounds = coord_bounds(shape);
         let pivot = coord_to_offset(lt, &coord_bounds);
-        let pivot = af::Array::new(&[pivot], dim4(1));
+        let pivot = af::Array::new(&[pivot], af::dim4!(1));
         let offsets = self.to_offsets(shape);
         let left = af::le(offsets.deref(), &pivot, true);
         let pivot = af::sum_all(&left).0;
@@ -255,12 +255,14 @@ impl Coords {
     ///
     /// Panics: if `reduce_axis <= source_shape.len()`
     pub fn expand(&self, source_shape: &[u64], reduce_axis: usize) -> Self {
-        assert!(reduce_axis <= source_shape.len());
-
         let ndim = self.ndim + 1;
+
+        assert_eq!(source_shape.len(), ndim);
+        assert!(reduce_axis <= ndim);
+
         let reduce_dim = source_shape[reduce_axis];
 
-        let dims = af::Dim4::new(&[1, reduce_dim, 1, 1]);
+        let dims = af::dim4!(1, reduce_dim);
         let reduced = af::range(dims, 1);
 
         let reduce_index = vec![reduce_axis as u64];
@@ -270,13 +272,13 @@ impl Coords {
             .map(|x| x as u64)
             .collect();
 
-        let tile_dims = af::Dim4::new(&[1, reduce_dim, 1, 1]);
-        let source_coord_dims = af::Dim4::new(&[ndim as u64, reduce_dim, 1, 1]);
+        let tile_dims = af::dim4!(1, reduce_dim);
+        let source_coord_dims = af::dim4!(ndim as u64, reduce_dim);
 
         let mut expanded = Vec::with_capacity(self.len());
         for i in 0..self.dims()[1] {
-            let i = i as f64;
-            let seqs = &[af::Seq::default(), af::Seq::new(i, i, 1.0)];
+            let i = i as i32;
+            let seqs = &[af::seq!(), af::seq!(i, i, 1)];
             let coord = af::index(&self.array, seqs);
             let coord = af::tile(&coord, tile_dims);
 
@@ -356,7 +358,7 @@ impl Coords {
             index.push(x);
         }
 
-        let offsets = af::Array::new(&offsets, dim4(offsets.len()));
+        let offsets = af::Array::new(&offsets, af::dim4!(offsets.len() as u64));
         let array = af::sub(self.get(&index).deref(), &offsets, true);
         Self { array, ndim }
     }
@@ -428,12 +430,12 @@ impl Coords {
         }
         assert_eq!(axes.len(), self.ndim);
 
-        let unsliced = af::Array::new(&unsliced, dim4(ndim));
+        let unsliced = af::Array::new(&unsliced, af::dim4!(ndim as u64));
         let tile_dims = af::Dim4::new(&[1, self.len() as u64, 1, 1]);
         let mut unsliced = af::tile(&unsliced, tile_dims);
         index_set(&mut unsliced, &axes, self);
 
-        let offsets = af::Array::new(&offsets, dim4(ndim));
+        let offsets = af::Array::new(&offsets, af::dim4!(ndim as u64));
         let offsets = af::tile(&offsets, tile_dims);
 
         Self {
@@ -484,11 +486,11 @@ impl Coords {
         assert_eq!(self.ndim, ndim);
 
         let coord_bounds = coord_bounds(shape);
-        let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, dim4(ndim));
+        let af_coord_bounds: af::Array<u64> = af::Array::new(&coord_bounds, af::dim4!(ndim as u64));
 
         let offsets = af::mul(&self.array, &af_coord_bounds, true);
         let offsets = af::sum(&offsets, 0).into();
-        af::moddims(&offsets, dim4(offsets.elements())).into()
+        af::moddims(&offsets, af::dim4!(offsets.elements() as u64)).into()
     }
 
     /// Return a list of [`Coord`]s from these `Coords`.
@@ -842,8 +844,8 @@ pub fn coord_to_offset(coord: &[u64], coord_bounds: &[u64]) -> u64 {
 
 fn index_get(subject: &af::Array<u64>, index: &[u64]) -> af::Array<u64> {
     let len = subject.dims()[1];
-    let index = af::Array::new(index, dim4(index.len()));
-    let seq4gen = af::Seq::new(0., (len - 1) as f32, 1.);
+    let index = af::Array::new(index, af::dim4!(index.len() as u64));
+    let seq4gen = af::seq!(0, (len - 1) as i32, 1);
     let mut indexer = af::Indexer::default();
     indexer.set_index(&index, 0, None);
     indexer.set_index(&seq4gen, 1, Some(true));
@@ -856,13 +858,13 @@ fn index_set(subject: &mut af::Array<u64>, index: &[u64], value: &af::Array<u64>
     debug_assert!(value.dims()[1] == subject.dims()[1]);
 
     let len = subject.dims()[1];
-    let index = af::Array::new(index, dim4(index.len()));
+    let index = af::Array::new(index, af::dim4!(index.len() as u64));
     if len == 1 {
         let mut indexer = af::Indexer::default();
         indexer.set_index(&index, 0, Some(false));
         af::assign_gen(subject, &indexer, value);
     } else {
-        let seq4gen = af::Seq::new(0., (len - 1) as f32, 1.);
+        let seq4gen = af::seq!(0, (len - 1) as i32, 1);
         let mut indexer = af::Indexer::default();
         indexer.set_index(&index, 0, None);
         indexer.set_index(&seq4gen, 1, Some(true));
