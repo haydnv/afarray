@@ -8,7 +8,7 @@ use destream::{de, en};
 use futures::TryFutureExt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use number_general::*;
-use safecast::{CastFrom, CastInto};
+use safecast::{as_type, AsType, CastFrom, CastInto};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
@@ -1602,77 +1602,18 @@ impl<T: af::HasAfEnum> CastFrom<Array> for ArrayExt<T> {
     }
 }
 
-impl From<ArrayExt<bool>> for Array {
-    fn from(i: ArrayExt<bool>) -> Array {
-        Array::Bool(i)
-    }
-}
-
-impl From<ArrayExt<Complex<f32>>> for Array {
-    fn from(c: ArrayExt<Complex<f32>>) -> Array {
-        Array::C32(c)
-    }
-}
-
-impl From<ArrayExt<Complex<f64>>> for Array {
-    fn from(c: ArrayExt<Complex<f64>>) -> Array {
-        Array::C64(c)
-    }
-}
-
-impl From<ArrayExt<f32>> for Array {
-    fn from(f: ArrayExt<f32>) -> Array {
-        Array::F32(f)
-    }
-}
-
-impl From<ArrayExt<f64>> for Array {
-    fn from(f: ArrayExt<f64>) -> Array {
-        Array::F64(f)
-    }
-}
-
-impl From<ArrayExt<i16>> for Array {
-    fn from(i: ArrayExt<i16>) -> Array {
-        Array::I16(i)
-    }
-}
-
-impl From<ArrayExt<i32>> for Array {
-    fn from(i: ArrayExt<i32>) -> Array {
-        Array::I32(i)
-    }
-}
-
-impl From<ArrayExt<i64>> for Array {
-    fn from(i: ArrayExt<i64>) -> Array {
-        Array::I64(i)
-    }
-}
-
-impl From<ArrayExt<u8>> for Array {
-    fn from(u: ArrayExt<u8>) -> Array {
-        Array::U8(u)
-    }
-}
-
-impl From<ArrayExt<u16>> for Array {
-    fn from(u: ArrayExt<u16>) -> Array {
-        Array::U16(u)
-    }
-}
-
-impl From<ArrayExt<u32>> for Array {
-    fn from(u: ArrayExt<u32>) -> Array {
-        Array::U32(u)
-    }
-}
-
-impl From<ArrayExt<u64>> for Array {
-    fn from(u: ArrayExt<u64>) -> Array {
-        Array::U64(u)
-    }
-}
+as_type!(Array, Bool, ArrayExt<bool>);
+as_type!(Array, C32, ArrayExt<Complex<f32>>);
+as_type!(Array, C64, ArrayExt<Complex<f64>>);
+as_type!(Array, F32, ArrayExt<f32>);
+as_type!(Array, F64, ArrayExt<f64>);
+as_type!(Array, I16, ArrayExt<i16>);
+as_type!(Array, I32, ArrayExt<i32>);
+as_type!(Array, I64, ArrayExt<i64>);
+as_type!(Array, U8, ArrayExt<u8>);
+as_type!(Array, U16, ArrayExt<u16>);
+as_type!(Array, U32, ArrayExt<u32>);
+as_type!(Array, U64, ArrayExt<u64>);
 
 impl<T: af::HasAfEnum> From<Vec<T>> for Array
 where
