@@ -8,7 +8,7 @@ use destream::{de, en};
 use futures::TryFutureExt;
 use num_traits::{FromPrimitive, ToPrimitive};
 use number_general::*;
-use safecast::{as_type, AsType, CastFrom, CastInto};
+use safecast::{as_type, CastFrom, CastInto};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
