@@ -6,6 +6,7 @@ use arrayfire as af;
 use async_trait::async_trait;
 use destream::{de, en};
 use futures::TryFutureExt;
+use get_size::GetSize;
 use num_traits::{FromPrimitive, ToPrimitive};
 use number_general::*;
 use safecast::{as_type, CastFrom, CastInto};
@@ -153,6 +154,12 @@ pub enum Array {
     U16(ArrayExt<u16>),
     U32(ArrayExt<u32>),
     U64(ArrayExt<u64>),
+}
+
+impl GetSize for Array {
+    fn get_size(&self) -> usize {
+        self.dtype().size() * self.len()
+    }
 }
 
 impl Array {

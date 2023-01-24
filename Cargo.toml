@@ -1,6 +1,6 @@
 [package]
 name = "afarray"
-version = "0.15.0"
+version = "0.15.1"
 authors = ["code@tinychain.net"]
 edition = "2021"
 license = "Apache-2.0"
@@ -17,6 +17,7 @@ async-trait = "0.1"
 collate = { version = "~0.2.3", features=["complex"] }
 destream = "0.6"
 futures = "0.3"
+get-size = "0.1"
 num-complex = "0.2"
 num-derive = "0.3"
 num-traits = "0.2"
